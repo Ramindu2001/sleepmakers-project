@@ -77,6 +77,22 @@ try {
     $anon->post($endpoint, ['context' => 'grn', 'doc_id' => $stock->grn['open'], 'action' => 'apply', 'raw' => $raw, 'csrf_token' => $token]);
     check('someone not signed in is refused (403)', $anon->status === 403, $anon);
 
+    echo "Transfer - sending\n";
+    signIn($a, 'e2e_alice', $pw);
+    shopLogin($a, $W, 'e2e_alice', $pw);
+    $a->get('Public/transfer-details.php?id=' . $stock->transfer);
+    $token = $a->csrf();
+    check('the sending shop\'s transfer page offers Scan / Upload', $a->has('btn-scan-upload') && $a->has('data-context="transfer_send"'), $a);
+    checkClean('the transfer page with the scanner dialog', $a);
+    scan($a, 'transfer_send', $stock->transfer, 'check', str_repeat("E2EBED01\n", 7), [], $token);
+    $line = $a->status === 200 ? $a->json('preview')['lines'][0] : null;
+    check('check picks the oldest batches first', $line !== null && $line['available'] === 10
+        && array_column($line['batches'], 'qty') === [5, 2] && !isset($line['parts']), $a);
+    scan($a, 'transfer_send', $stock->transfer, 'apply', str_repeat("E2EBED01\n", 7) . "E2ESHT01\nE2ESHT01\nE2ESHT01\n", [], $token);
+    check('apply adds a line per batch', $a->status === 200 && array_column($stock->transferLines(), 'TransferQty') === ['5.000', '2.000', '3.000'], $a);
+    scan($a, 'transfer_send', $stock->transfer, 'apply', str_repeat("E2EBED01\n", 4), [], $token);
+    check('more than the stock left is refused (422)', $a->status === 422 && count($stock->transferLines()) === 3, $a);
+
     //scenarios of later tasks are added above this line
 } finally {
     $stock->down();

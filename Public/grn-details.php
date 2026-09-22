@@ -970,7 +970,7 @@ else
     <!-- footer End  -->
 
     <!-- <script src="../Assets/jquery/grn.js"></script> -->
-    <script src="../Assets/jquery/grn_detail.js"></script>
+    <script src="../Assets/jquery/grn_detail.js?v=20260922"></script>
 
     <script>
         function addChq()
@@ -1244,7 +1244,7 @@ else
         $scan_upload = ['context' => 'grn', 'doc_id' => $grn_header_id, 'title' => $grn_no, 'apply_label' => 'Add to GRN'];
         include '../View/modals/scan-upload.php';
         ?>
-    <script src="../Assets/jquery/scan_upload.js"></script>
+    <script src="../Assets/jquery/scan_upload.js?v=20260922"></script>
         <?php
     }//scanner upload
     ?>

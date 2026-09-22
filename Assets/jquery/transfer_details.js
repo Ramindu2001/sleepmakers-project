@@ -516,5 +516,11 @@ function getTransferDetail(header_id)
     }, function(data){
         $("#tbl_transfer_detail").html(data);
     });//get table
-    
+
 }//load table
+
+//a scanner upload changed the lines (Assets/jquery/scan_upload.js): reload the table and totals
+$(document).on('scanupload:applied', function(e, result){
+    getTransferDetail(result.doc_id);
+    getFinalTotal(result.doc_id);
+});

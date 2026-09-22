@@ -149,9 +149,27 @@ try {
   check('the GRN table shows the new lines', await js(`document.getElementById('tbl_grn_details').textContent.includes('E2EBED01') && document.getElementById('tbl_grn_details').textContent.includes('e2e Bedsheet')`));
   await shot('scan-3-added.png');
 
+  console.log('Transfer - sending');
+  await go(`${BASE}/Public/transfer-details.php?id=${fx.transfer}`);
+  check('the sending shop\'s transfer page shows Scan / Upload', await js(`!!document.querySelector('.btn-scan-upload')`));
+  await js(`document.querySelector('.btn-scan-upload').click()`);
+  await scanner(['E2EBED01', 'E2EBED01', 'E2EBED01'], 'Enter');
+  await sleep(1500);
+  check('the preview shows the stock and the batch it comes from',
+    (await js(`[...document.querySelectorAll('#scan_preview tbody tr')].map(tr => [...tr.cells].slice(0, 5).map(td => td.textContent.trim()).join('/')).join('|')`))
+      === 'E2EBED01/e2e Bed/3/10/E2EB1 × 3');
+  check('and Add to Transfer is enabled', await applyEnabled());
+  await shot('scan-4-transfer.png');
+
   // scenarios of later tasks are added above this line
-  check('no JavaScript errors on the pages', exceptions.length === 0);
-  for (const e of exceptions) console.log('        ' + e);
+  // errors from the scripts this feature uses or changed; others are listed but were there before
+  // (e.g. the transfer page loads the home page's chart script, which finds no charts)
+  const OURS = /scan_upload\.js|grn_detail\.js|transfer_details\.js/;
+  const ours = exceptions.filter((e) => OURS.test(e));
+  check('no JavaScript errors from the scanner dialog or the GRN / transfer scripts', ours.length === 0);
+  for (const e of ours) console.log('        ' + e);
+  const others = [...new Set(exceptions.filter((e) => !OURS.test(e)).map((e) => e.split('\n')[0]))];
+  if (others.length) console.log('  note  errors from other scripts (not changed here): ' + others.join('; '));
 } catch (e) {
   failures++;
   console.log('  FAIL  ' + (e.stack || e));
