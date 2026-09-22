@@ -30,6 +30,8 @@ The project uses a traditional PHP application structure with separate folders f
 - View stock by product, shop, and price history
 - Search inventory by barcode or item name
 - Support for stock calculations and stock value reporting
+- Scanner upload: a batch of scanned barcodes goes into a GRN, a transfer being sent, or the
+  received quantities of a transfer, checked and counted per product (see `db/SCAN_UPLOAD_MODULE.md`)
 
 ### Reporting
 - Inventory reports with stock sale and stock value calculations
@@ -118,6 +120,8 @@ Typical usage flow:
 sh tools/get-phpunit.sh                                      # once: downloads PHPUnit 11
 C:/xampp/php/php.exe tools/phpunit.phar                      # unit + integration (database sleepmakers_test)
 C:/xampp/php/php.exe tests/e2e/shop_login_e2e.php [base-url] # end to end against a running local site
+C:/xampp/php/php.exe tests/e2e/scan_upload_e2e.php [base-url]
+node tests/ui/scan_upload_ui.mjs [screenshot-folder]         # headless Chrome (Node 24+), the scanner dialog
 ```
 
 ## Development Notes

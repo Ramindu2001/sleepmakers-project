@@ -208,3 +208,15 @@ Rights use a new `ShopAccess::hasFeatureRight($user_id, $shop_id, $feature_id, $
 One commit and push per step on `development`:
 parser + table → GRN → transfer send → transfer receive → docs.
 Deploy: back up, run `php db/scan_upload_install.php`, upload the code.
+
+## 14. Found while building
+
+- The test schema (`tests/fixtures/stock_schema.sql`) keeps the stock tables' foreign keys
+  (only grnheader -> suppliers is dropped) and seeds rack 1, the default rack every GRN line
+  of a shop without racks uses; the schema loads with foreign-key checks off, as a dump does.
+- The E2E helpers moved to `tests/e2e/lib.php`; `tests/e2e/fixtures.php up|down` creates and
+  removes the e2e records for the browser check (`tests/ui/scan_upload_ui.mjs`).
+- `grn_detail.js` and `transfer_details.js` are loaded with `?v=20260922` so browsers fetch
+  the versions that reload their tables after an upload.
+- Follow-up (not changed): the transfer details page loads the home page's chart script
+  (`Assets/js/dashboard.js` with ApexCharts), which throws "Element not found" on every visit.
