@@ -623,6 +623,15 @@ function calculateDiscount() {
 calculateDiscount();
 
 
+//a scanner upload added lines (Assets/jquery/scan_upload.js): reload the table and totals
+$(document).on('scanupload:applied', function(){
+    var grn_header_id = $("#hide_header_id").val();
+    LoadTable(grn_header_id);
+    setTimeout(() => {
+        getFinalTotal();
+    }, 1000);
+});
+
 //===================== Functions ==================//
 function getFinalTotal()
 {

@@ -86,6 +86,10 @@ else
     }
 
     include "../View/modals/add_grn_product.php";
+
+    //scanner upload (docs/superpowers/specs/2026-09-22-scanner-upload-design.md): open GRNs, GRN create/edit right
+    require_once '../Includes/scan_upload.php';
+    $grnScanAllowed = $grn_header_stat < 2 && (new ShopAccess())->hasFeatureRight($_SESSION['user_id'], $shop_id, GrnScan::FEATURE, GrnScan::RIGHTS);
     ?>
             <!--  Sidebar End -->
             <!--  Main wrapper -->
@@ -251,6 +255,10 @@ else
                                 GRN Detail
                                 <button class="btn btn-primary float-end" id="btn_open_grn_products">Add
                                     Products</button>
+                                <?php if($grnScanAllowed) { ?>
+                                <button type="button" class="btn btn-outline-primary float-end me-2 btn-scan-upload"><i
+                                        class="ti ti-barcode"></i> Scan / Upload</button>
+                                <?php } ?>
                             </h5>
                         </div>
                         <div class="card-body">
@@ -1230,6 +1238,16 @@ else
     </script>
 
     <script src="../Assets/libs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <?php
+    if($grnScanAllowed)
+    {
+        $scan_upload = ['context' => 'grn', 'doc_id' => $grn_header_id, 'title' => $grn_no, 'apply_label' => 'Add to GRN'];
+        include '../View/modals/scan-upload.php';
+        ?>
+    <script src="../Assets/jquery/scan_upload.js"></script>
+        <?php
+    }//scanner upload
+    ?>
     <script src="../Assets/js/sidebarmenu.js"></script>
     <script src="../Assets/js/app.min.js"></script>
     <script src="../Assets/libs/simplebar/dist/simplebar.js"></script>
