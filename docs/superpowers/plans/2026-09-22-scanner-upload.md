@@ -986,7 +986,7 @@ abstract class ScanDocument extends Dbh
     }//construct
 
     //a preview line for a code that cannot be used as it is
-    protected function errorLine($key, $qty, $message, array $product = null)
+    protected function errorLine($key, $qty, $message, ?array $product = null)
     {
         return [
             'key' => (string)$key,
