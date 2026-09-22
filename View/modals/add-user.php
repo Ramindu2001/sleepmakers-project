@@ -53,7 +53,7 @@
                                 <span class="text-success" id="pyes" style="display:none;">Password match!</span>
                             </div>
                             <div class="m-3">
-                                <label for="userRole" class="form-label">Select User Role <span class="text-danger">*</span></label>
+                                <label for="userRole" class="form-label">Default Role <span class="text-danger">*</span></label>
                                 <select name="userRole" id="userRole" class="form-select" required  multiple>
                                     <option value="" disabled>Select User Role</option>
                                     <?php 
@@ -65,6 +65,7 @@
                           }
                           ?>
                                 </select>
+                                <small class="text-muted">Rights in each shop are set under Settings &rarr; Assign Users to Shops.</small>
                             </div>
                             <?php 
                             if($userType==1)

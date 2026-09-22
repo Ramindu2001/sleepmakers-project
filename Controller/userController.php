@@ -83,7 +83,8 @@ if(isset($_POST['add-user']))
                         {
                             if(isset($_SESSION['shop_id']) && !empty($_SESSION['shop_id'])) {
                                 $shopUserObj = new AddUsersModels();
-                                $shopUserObj->setUserModels($_SESSION['shop_id'], $add_users);
+                                //joins the shop they were created from, with their default role
+                                $shopUserObj->assignUser($_SESSION['shop_id'], $add_users, $userRole);
                             }
                             $_SESSION['user_error']=1;   
                             header("Location: ../Public/users.php");

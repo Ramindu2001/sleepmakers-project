@@ -2,37 +2,6 @@
 
 class AddUsersModels extends Dbh
 {
-    public function setUserModels($shop_SHID, $user_USID)
-    {
-        try {
-            // Check if the user is already assigned to the shop
-            $checkSql = "SELECT COUNT(*) FROM shopusers WHERE shop_SHID = ? AND user_USID = ?";
-            $checkStmt = $this->connect()->prepare($checkSql);
-            $checkStmt->execute([$shop_SHID, $user_USID]);
-            $count = $checkStmt->fetchColumn();
-
-            if ($count > 0) {
-                return "User already assigned to this shop";
-            }
-
-            //the user's default role becomes their role in this shop
-            $sql = "INSERT INTO shopusers (shop_SHID, user_USID, UserRoles_URID)
-            SELECT ?, USID, UserRoles_URID FROM user WHERE USID = ?";
-            $stmt = $this->connect()->prepare($sql);
-            $stmt->execute([$shop_SHID, $user_USID]);
-            $run = 1;
-        } catch (PDOException $e) {
-            error_log("PDOException: " . $e->getMessage());
-            die("Error: Unable to Add Users. " . $e->getMessage());
-            $run = 2;
-        }
-        if ($run == 1) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
     //assign a user to a shop with the role they will hold there. Returns 'assigned', or
     //'exists' when they are already assigned to that shop (change the role with updateRole).
     //Unlike the older methods here this one throws PDOException - the JSON controller

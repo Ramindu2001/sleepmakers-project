@@ -173,6 +173,16 @@ class E2EFixtures
         return (int) $stmt->fetchColumn();
     }
 
+    //the role a user (by name, without the e2e_ prefix) holds in a shop, or 0
+    public function roleOf($name, $shop)
+    {
+        $stmt = $this->pdo->prepare("SELECT shopusers.UserRoles_URID FROM shopusers
+            INNER JOIN user ON user.USID = shopusers.user_USID
+            WHERE user.UserName = ? AND shopusers.shop_SHID = ?");
+        $stmt->execute(['e2e_' . $name, $this->shops[$shop]]);
+        return (int) $stmt->fetchColumn();
+    }
+
     public function lastLogin($user)
     {
         $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM userlog WHERE user_USID = ?");
@@ -376,6 +386,14 @@ try {
 
     $b->post($endpoint, ['action' => 'delete', 'suid' => $bobW, 'csrf_token' => $token]);
     check('an assignment without history can be deleted', $b->json('ok') === true && $fx->suid('bob', 'W') === 0, $b);
+
+    echo "Users page\n";
+    $b->get('Public/users.php');
+    check('the users page calls the role the Default Role', $b->has('<th>Default Role</th>') && $b->has('Assign Users to Shops.</small>'), $b);
+    checkClean('the users page', $b);
+    $b->post('Controller/userController.php', ['add-user' => '1', 'username' => 'e2e_dave', 'userEmail' => 'e2e_dave@example.com',
+        'userContact' => '0000000000', 'password' => $pw, 'userRole' => $fx->roles['keeper']]);
+    check('a new user joins the current shop with the role chosen for them', $fx->roleOf('dave', 'W') === $fx->roles['keeper'], $b);
 
     //scenarios of later tasks are added above this line
 } finally {

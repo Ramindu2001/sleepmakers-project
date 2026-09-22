@@ -41,7 +41,7 @@
                                 <input type="tel" name="userContact" id="euserContact" class="form-control" placeholder="Eg: +94-777-123-456" required>
                             </div>
                             <div class="m-2">
-                                <label for="userRole" class="form-label">Select User Role <span class="text-danger">*</span></label>
+                                <label for="userRole" class="form-label">Default Role <span class="text-danger">*</span></label>
                                 <select name="userRole" id="euserRole" class="form-select" required >
                                     <option value=""  disabled>Select User Role</option>
                                     <?php 
@@ -53,6 +53,7 @@
                           }
                           ?>
                                 </select>
+                                <small class="text-muted">Rights in each shop are set under Settings &rarr; Assign Users to Shops.</small>
                             </div>                            
                             <div class="m-2">
                                 <label for="epaylimit" class="form-label">Daily Bill Limit</label>

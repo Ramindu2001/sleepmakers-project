@@ -145,7 +145,7 @@ include '../Includes/authcheck.php';
                                             <th>User Email</th>
                                             <th>User Contact</th>
                                             <th>Daily Bill Limit</th>
-                                            <th>User Role</th>
+                                            <th>Default Role</th>
 
                                             <th>Status</th>
                                             <th>Action</th>
