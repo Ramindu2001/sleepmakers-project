@@ -28,6 +28,7 @@ require_once __DIR__ . '/../db/shop_access_migration.php';
 require_once __DIR__ . '/../db/scan_upload_migration.php';
 require_once __DIR__ . '/../db/customer_orders_migration.php';
 require_once __DIR__ . '/../Includes/scan_upload.php';
+require_once __DIR__ . '/../Includes/customer_orders.php';
 require_once __DIR__ . '/../Includes/csrf.php';
 require_once __DIR__ . '/../Includes/shop_session.php';
 require_once __DIR__ . '/DatabaseTestCase.php';
