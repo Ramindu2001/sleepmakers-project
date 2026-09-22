@@ -35,7 +35,6 @@ if (isset($_POST['btn_shop_login']))
         exit;
     }//refused: back to the shop screen, which reopens this shop's dialog
 
-    $remember = isset($_SESSION["remember_me"]) || isset($_COOKIE["remember_meS"]);
     session_regenerate_id(true); //new privileges, new session id
     $switched = shop_session_enter($_SESSION, $result['user'], $shop_id);
     if($switched)
@@ -46,11 +45,7 @@ if (isset($_POST['btn_shop_login']))
         $login_date_time = date("Y-m-d H:i:s");
         (new User())->setUserLog($login_date_time, $login_date_time, 1, $result['user']['USID']);
     }//another user took over
-    elseif($remember)
-    {
-        //signed token, only for a shop this user may open - see Includes/remember_me.php
-        (new RememberMe())->rememberShop($_SESSION['user_id'], $shop_id);
-    }//same user, remember-me on
+    //the shop itself is never remembered: every shop entry takes the password
 
     header("Location: ../Public/home.php");
     exit;

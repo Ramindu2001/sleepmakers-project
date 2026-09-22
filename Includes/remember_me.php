@@ -6,15 +6,16 @@
 //user, Admin included, just by setting that cookie. They also used path "/", so every other
 //application on this domain received them and was logged in by them too.
 //
-//The cookies now carry a token signed with a secret that only this server knows (HMAC-SHA256):
+//The cookie now carries a token signed with a secret that only this server knows (HMAC-SHA256):
 //
 //  remember_me_token       v1.<user id>.<expires>.<signature over the user id, expiry and password hash>
-//  remember_me_shop_token  v1.<shop id>.<expires>.<signature over the user id, shop id and expiry>
 //
 //- a token cannot be created or altered without the secret, and cannot be extended
 //- changing a user's password, or disabling the user, signs every remembered browser out
-//- a remembered shop is restored only while that user may still open that shop
-//- the cookies are HttpOnly and scoped to this application's folder
+//- it remembers the main sign in only. A shop is never remembered: every shop entry takes the
+//  username and password (db/SHOP_ACCESS_MODULE.md). The shop cookie an earlier version set
+//  (remember_me_shop_token) is only ever cleared.
+//- the cookie is HttpOnly and scoped to this application's folder
 //- the old cookies are never read again: those browsers simply log in once more
 //
 //The secret is Includes/remember_me_secret.php. It is created on first use and kept out of git;
@@ -24,7 +25,7 @@ require_once __DIR__ . '/../Model/shop_access_class.php';
 class RememberMe extends Dbh
 {
     const USER_COOKIE = 'remember_me_token';
-    const SHOP_COOKIE = 'remember_me_shop_token';
+    const SHOP_COOKIE = 'remember_me_shop_token';   //set by an earlier version - only ever cleared
     const LIFETIME    = 2592000;    //30 days, as before
 
     //the cookies this replaces - only ever cleared, never trusted
@@ -74,47 +75,6 @@ class RememberMe extends Dbh
 
         return (int)$user['USID'];
     }//user from cookie
-
-    //remember the shop this user works in, in this browser
-    public function rememberShop($user_id, $shop_id)
-    {
-        if(!$this->canAccessShop($user_id, $shop_id))
-        {
-            return false;
-        }//not a shop this user may open
-
-        $expires = time() + self::LIFETIME;
-        $signature = $this->sign("shop|" . (int)$user_id . "|" . (int)$shop_id . "|" . $expires);
-        if($signature === null)
-        {
-            return false;
-        }//no secret available
-
-        return self::setCookie(self::SHOP_COOKIE, "v1." . (int)$shop_id . "." . $expires . "." . $signature, $expires);
-    }//remember shop
-
-    //the shop this user was working in, or null
-    public function shopFromCookie($user_id)
-    {
-        $token = self::readToken(self::SHOP_COOKIE);
-        if($token === null)
-        {
-            return null;
-        }//no valid looking token
-
-        $expected = $this->sign("shop|" . (int)$user_id . "|" . $token['id'] . "|" . $token['expires']);
-        if($expected === null || !hash_equals($expected, $token['signature']))
-        {
-            return null;
-        }//forged, altered, or remembered for another user
-
-        if(!$this->canAccessShop($user_id, $token['id']))
-        {
-            return null;
-        }//no longer allowed into that shop
-
-        return $token['id'];
-    }//shop from cookie
 
     //may this user open this shop? The one rule lives in ShopAccess (Model/shop_access_class.php):
     //UserType 1 opens every shop, everyone else only the active shops they hold an active role in.

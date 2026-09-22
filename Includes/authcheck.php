@@ -44,13 +44,9 @@ if(isset($_SESSION['shop_id']))
 {
     $shop_id = $_SESSION['shop_id'];
 }//if shop set
-else if(($remembered_shop_id = (new RememberMe())->shopFromCookie($_SESSION['user_id'])) !== null)
-{
-    $_SESSION['shop_id'] = $remembered_shop_id;
-    $shop_id = $_SESSION['shop_id'];
-}
 else
 {
+    //a shop is entered only through its sign in on the shop screen (never from a cookie)
     header("Location: ../Public/dashboard.php");
     exit;
 }//else goto dashboard

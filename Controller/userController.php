@@ -477,21 +477,9 @@ elseif(isset($_POST['btn_log_in']))
                 (new RememberMe())->rememberUser($data[0]['USID']); //signed token, see Includes/remember_me.php
             }//remember me
 
-            if(count($shops)==1)
-            {
-                //one shop: the password just checked opens it - the shop screen would only ask again
-                $_SESSION['shop_id'] = $shops[0]['SHID'];
-                if(isset($_POST["remember_me"]))
-                {
-                    (new RememberMe())->rememberShop($data[0]['USID'], $shops[0]['SHID']);
-                }//remembered with its shop
-                header("Location: ../Public/home.php");
-            }//single shop
-            else
-            {
-                $_SESSION["toast"]=1;
-                header("Location: ../Public/dashboard.php");
-            }//choose a shop
+            //always the shop screen, even with a single shop: entering a shop takes its own sign in
+            $_SESSION["toast"]=1;
+            header("Location: ../Public/dashboard.php");
         }//signed in
     }//user exists, active, right password
 }//log into system

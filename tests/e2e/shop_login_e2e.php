@@ -79,6 +79,18 @@ class E2EBrowser
         return is_array($data) && array_key_exists($key, $data) ? $data[$key] : null;
     }
 
+    //a cookie the browser holds (curl writes the jar when each request completes)
+    public function hasCookie($name)
+    {
+        foreach (file($this->jar) as $line) {
+            $fields = explode("\t", rtrim($line, "\r\n"));
+            if (count($fields) === 7 && $fields[5] === $name) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public function isOn($page) { return strpos(parse_url($this->url, PHP_URL_PATH), '/' . $page) !== false; }
     public function has($text) { return strpos($this->body, $text) !== false; }
 
@@ -320,7 +332,11 @@ try {
 
     echo "Main login\n";
     signIn($b, 'e2e_bob', $pw);
-    check('bob, with one shop, goes straight into it', $b->isOn('Public/home.php'), $b);
+    check('bob, with one shop, still lands on the shop screen', $b->isOn('Public/dashboard.php') && $b->has('e2e Showroom'), $b);
+    $b->get('Public/home.php');
+    check('and cannot open a page before signing in to the shop', $b->isOn('Public/dashboard.php'), $b);
+    shopLogin($b, $S, 'e2e_bob', $pw);
+    check('he enters his shop by signing in to it', $b->isOn('Public/home.php'), $b);
     signIn($b, 'e2e_carol', $pw);
     check('carol, whose only role is inactive, is told so', $b->isOn('Public/login.php') && $b->has('Inactive userrole'), $b);
     $fx->setActive('bob', 'S', 0);
@@ -331,21 +347,22 @@ try {
     echo "Remember me\n";
     $b->get('Public/logout.php');
     $b->post('Controller/userController.php', ['user_name' => 'e2e_bob', 'user_pwd' => $pw, 'btn_log_in' => 'Sign In', 'remember_me' => 'on']);
+    shopLogin($b, $S, 'e2e_bob', $pw);
     $b->dropSession();
     $b->get('Public/login.php');
-    check('a remembered single-shop user comes straight back into his shop', $b->isOn('Public/home.php'), $b);
+    check('a remembered user comes back signed in, to the shop screen', $b->isOn('Public/dashboard.php') && $b->has('e2e Showroom'), $b);
+    $b->get('Public/home.php');
+    check('the shop he was in is not reopened without its password', $b->isOn('Public/dashboard.php'), $b);
+    check('no remembered shop is stored in the browser', !$b->hasCookie('remember_me_shop_token'), $b);
 
     $b->get('Public/logout.php');
     $b->post('Controller/userController.php', ['user_name' => 'e2e_alice', 'user_pwd' => $pw, 'btn_log_in' => 'Sign In', 'remember_me' => 'on']);
     shopLogin($b, $W, 'e2e_alice', $pw);
     $b->dropSession();
-    $b->get('Public/login.php');
-    check('a remembered user comes back into the shop she signed into', $b->isOn('Public/home.php') && sees($b, 'store.php'), $b);
-    $fx->setActive('alice', 'W', 0);
-    $b->dropSession();
-    $b->get('Public/login.php');
-    check('but not once her access to it was revoked', $b->isOn('Public/dashboard.php'), $b);
-    $fx->setActive('alice', 'W', 1);
+    $b->get('Public/home.php');
+    check('a remembered user opening a shop page is sent to the shop screen', $b->isOn('Public/dashboard.php'), $b);
+    shopLogin($b, $W, 'e2e_alice', $pw);
+    check('and gets back in by signing in to the shop', $b->isOn('Public/home.php') && sees($b, 'store.php'), $b);
     $b->get('Public/logout.php');
 
     echo "Assign Users to Shops\n";
@@ -382,7 +399,7 @@ try {
 
     $bob = new E2EBrowser($base);
     signIn($bob, 'e2e_bob', $pw);
-    check('bob is back to one shop and goes straight in', $bob->isOn('Public/home.php'), $bob);
+    check('bob is back to one shop, offered on the shop screen', $bob->isOn('Public/dashboard.php') && !$bob->has('e2e Warehouse') && $bob->has('e2e Showroom'), $bob);
 
     $b->post($endpoint, ['action' => 'delete', 'suid' => $bobW, 'csrf_token' => $token]);
     check('an assignment without history can be deleted', $b->json('ok') === true && $fx->suid('bob', 'W') === 0, $b);

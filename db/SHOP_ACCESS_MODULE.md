@@ -39,7 +39,11 @@ Assignments whose user no longer exists get role `0` and are revoked; the instal
   *Sign in to <shop>* dialog. Anyone with access to that shop can sign in there with their
   normal username and password - the session then belongs to them (a shared counter can be
   handed over through *Switch Shop*).
-- A user with a single shop goes straight into it after the main sign in.
+- There are always two sign ins: the main sign in, then the shop's. Every user lands on the
+  shop screen after the main sign in, even with a single shop, and new shops appear there as
+  soon as they are assigned.
+- *Remember me* keeps only the main sign in. A remembered browser opens on the shop screen and
+  the shop still asks for the password; a shop is never remembered.
 - **Who may enter a shop:** a super admin (`UserType = 1`) - every shop. Everyone else - an
   active assignment, to an active shop, with an active role, while their account is active.
   Expired or inactive companies stay closed to non-admins, as before.

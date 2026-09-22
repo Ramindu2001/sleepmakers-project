@@ -283,3 +283,15 @@ New `Includes/csrf.php`: `csrf_token()` (per-session random token) and
 - Pre-existing undefined-variable notices in some modal templates (SysFeatures, new-company,
   SalesRep*, add-units) and `Reports/batchwise.php`.
 - The rest of `Controller/shopController.php` (create/update shop) has no authentication check.
+
+## 13. Revision 1 (2026-09-22, after the customer's review)
+
+The customer asked for two sign ins every time: the main one, then the shop's. This supersedes
+the single-shop and remember-me rows of §3 and the matching parts of §5 and §6.
+
+- **Always the shop screen.** After the main sign in every user lands on `dashboard.php`, even
+  with a single shop, and enters the shop through its dialog. `$_SESSION['shop_id']` is now
+  written only by the shop login (`shopController.php`, `btn_shop_login`).
+- **Remember me keeps only the main sign in.** `RememberMe::rememberShop()` and
+  `shopFromCookie()` were removed. `authcheck.php` no longer restores a shop, and
+  `dashboard.php` clears a shop cookie left by the earlier version without reading it.

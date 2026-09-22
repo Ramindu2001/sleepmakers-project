@@ -14,13 +14,10 @@ if(isset($_SESSION['shop_id']))
   header("Location:../Public/home.php");
   exit;
 }//already in a shop
-else if(($remembered_shop_id = (new RememberMe())->shopFromCookie($_SESSION['user_id'])) !== null)
+if(isset($_COOKIE[RememberMe::SHOP_COOKIE]) || isset($_COOKIE[RememberMe::LEGACY_COOKIES[1]]))
 {
-  //signed remember-me shop cookie, see Includes/remember_me.php
-  $_SESSION['shop_id']=$remembered_shop_id;
-  header("Location:../Public/home.php");
-  exit;
-}//remembered shop
+  RememberMe::forgetShop();
+}//a shop remembered by an earlier version: cleared, never trusted - shops always ask
 
 $shopAccess = new ShopAccess();
 $shops = $shopAccess->getSelectableShops($user_id);
