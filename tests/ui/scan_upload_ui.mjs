@@ -1,209 +1,104 @@
-// Browser check of the scanner upload dialog: drives headless Chrome over the DevTools
-// protocol and types like the scanner's cradle does (fast keys, Enter or Tab after each code,
-// or no separator at all) without clicking into any field first.
+// Browser check of the scanner upload dialog: types like the scanner's cradle does (fast keys,
+// Enter or Tab after each code, or no separator at all) without clicking into any field first.
 //
 //   node tests/ui/scan_upload_ui.mjs [screenshot-folder]
 //
-// Needs Node 24+, Chrome, and the local site at BASE with its PHP. Environment overrides:
-// BASE (http://localhost/sleepmakers), CHROME, PHP. It creates its own e2e records
-// (tests/e2e/fixtures.php) and removes them at the end, whatever happens.
-import { spawn, execFileSync } from 'node:child_process';
-import { writeFileSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+// Needs Node 24+, Chrome and the local site; see tests/ui/harness.mjs.
+import { UiRun, BASE, sleep } from './harness.mjs';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const OUT = process.argv[2] || null;
-const BASE = process.env.BASE || 'http://localhost/sleepmakers';
-const CHROME = process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
-const PHP = process.env.PHP || 'C:/xampp/php/php.exe';
-const PORT = 9334;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const fixtures = (command) => execFileSync(PHP, [join(ROOT, 'tests/e2e/fixtures.php'), command], { encoding: 'utf8' });
+const run = new UiRun(process.argv[2], 9334);
+const rows = () => run.js(`[...document.querySelectorAll('#scan_preview tbody tr')].map(tr => tr.cells[0].textContent.trim() + ':' + tr.cells[2].textContent.trim()).join('|')`);
+const boxLines = () => run.js(`document.getElementById('scan_capture').value.split('\\n').filter(l => l.trim() !== '').length`);
+const applyEnabled = () => run.js(`!document.getElementById('scan_apply').disabled`);
+const dialogOpen = () => run.js(`document.getElementById('scan_upload_modal').classList.contains('show')`);
 
-let failures = 0;
-const check = (label, ok) => { console.log(`${ok ? '  PASS' : '  FAIL'}  ${label}`); if (!ok) failures++; };
-
-const fx = JSON.parse(fixtures('up'));
-const chrome = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${PORT}`,
-  `--user-data-dir=${mkdtempSync(join(tmpdir(), 'scanui'))}`, '--window-size=1600,1000', '--hide-scrollbars', 'about:blank'], { stdio: 'ignore' });
-
-let ws;
-let id = 0;
-const pending = new Map();
-const waiters = [];
-const dialogs = [];
-const exceptions = [];
-
-function send(method, params = {}) {
-  const n = ++id;
-  ws.send(JSON.stringify({ id: n, method, params }));
-  return new Promise((r) => pending.set(n, r));
-}
-function loaded() {
-  return new Promise((resolve) => {
-    const wait = (msg) => (msg.method === 'Page.loadEventFired' ? resolve() : waiters.push(wait));
-    waiters.push(wait);
-  });
-}
-async function js(expr) {
-  const r = await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true });
-  return r.result?.result?.value;
-}
-async function go(url) { const l = loaded(); await send('Page.navigate', { url }); await l; await sleep(400); }
-async function submit(expr) { const l = loaded(); await js(expr); await l; await sleep(700); }
-async function shot(name) {
-  if (!OUT) return;
-  const r = await send('Page.captureScreenshot', { format: 'png' });
-  writeFileSync(join(OUT, name), Buffer.from(r.result.data, 'base64'));
-}
-
-// the cradle: every character as a real key press, then the scanner's suffix
-const KEYS = { Enter: { code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' }, Tab: { code: 'Tab', windowsVirtualKeyCode: 9 } };
-async function press(key) {
-  const k = KEYS[key] || { text: key };
-  await send('Input.dispatchKeyEvent', { type: 'keyDown', key, ...k });
-  await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code: k.code });
-}
-async function scanner(codes, suffix) {
-  for (const code of codes) {
-    for (const c of code) await press(c);
-    if (suffix) await press(suffix);
-  }
-}
-const rows = () => js(`[...document.querySelectorAll('#scan_preview tbody tr')].map(tr => tr.cells[0].textContent.trim() + ':' + tr.cells[2].textContent.trim()).join('|')`);
-const boxLines = () => js(`document.getElementById('scan_capture').value.split('\\n').filter(l => l.trim() !== '').length`);
-const applyEnabled = () => js(`!document.getElementById('scan_apply').disabled`);
-const dialogOpen = () => js(`document.getElementById('scan_upload_modal').classList.contains('show')`);
-
+let failure = null;
 try {
-  for (let i = 0; i < 50 && !ws; i++) {
-    try {
-      const page = (await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json()).find((t) => t.type === 'page');
-      if (page) ws = new WebSocket(page.webSocketDebuggerUrl);
-    } catch { await sleep(200); }
-  }
-  if (!ws) throw new Error('Chrome did not start');
-  await new Promise((r) => ws.addEventListener('open', r, { once: true }));
-  ws.addEventListener('message', (e) => {
-    const msg = JSON.parse(e.data);
-    if (msg.id && pending.has(msg.id)) { pending.get(msg.id)(msg); pending.delete(msg.id); return; }
-    if (msg.method === 'Page.javascriptDialogOpening') { dialogs.push(msg.params.message); send('Page.handleJavaScriptDialog', { accept: true }); }
-    if (msg.method === 'Runtime.exceptionThrown') exceptions.push(msg.params.exceptionDetails.exception?.description || msg.params.exceptionDetails.text);
-    for (const w of waiters.splice(0)) w(msg);
-  });
-  await send('Page.enable');
-  await send('Runtime.enable');
+  const fx = await run.start();
 
   console.log('Sign in to the e2e Warehouse');
-  await go(`${BASE}/Public/logout.php`);
-  await go(`${BASE}/Public/login.php`);
-  await submit(`document.getElementById('user_name').value='e2e_alice';document.getElementById('user_pwd').value=${JSON.stringify(fx.password)};document.querySelector('input[name=btn_log_in]').click()`);
-  await js(`document.querySelector('.synnex-shop[data-shop-id="${fx.shops.W}"]').click()`);
-  await sleep(800);
-  await submit(`document.getElementById('shop_user_pwd').value=${JSON.stringify(fx.password)};document.querySelector('input[name=btn_shop_login]').click()`);
-  check('signed in to the warehouse', (await js('location.pathname')).endsWith('/Public/home.php'));
+  await run.signIn('e2e_alice', fx.shops.W);
+  run.check('signed in to the warehouse', (await run.js('location.pathname')).endsWith('/Public/home.php'));
 
   console.log('GRN - Scan / Upload');
-  await submit(`(() => { const f = document.createElement('form'); f.method = 'post'; f.action = 'grn-details.php';
+  await run.submit(`(() => { const f = document.createElement('form'); f.method = 'post'; f.action = 'grn-details.php';
     for (const [k, v] of [['grn_header_id', '${fx.grn.open}'], ['grn_header_stat', '0']]) { const i = document.createElement('input'); i.name = k; i.value = v; f.appendChild(i); }
     document.body.appendChild(f); f.submit(); })()`);
-  check('the GRN page shows Scan / Upload', await js(`!!document.querySelector('.btn-scan-upload')`));
-  check('the dialog starts closed', !(await dialogOpen()));
+  run.check('the GRN page shows Scan / Upload', await run.js(`!!document.querySelector('.btn-scan-upload')`));
+  run.check('the dialog starts closed', !(await dialogOpen()));
 
-  await js('document.activeElement && document.activeElement.blur()');
-  await scanner(['E2EBED01', 'E2EBED01', 'E2ESHT01'], 'Enter');
+  await run.js('document.activeElement && document.activeElement.blur()');
+  await run.scanner(['E2EBED01', 'E2EBED01', 'E2ESHT01'], 'Enter');
   await sleep(1500);
-  check('an upload with no field selected opens the dialog by itself', await dialogOpen());
-  check('each code lands on its own line', (await boxLines()) === 3);
-  check('the preview counts each product', (await rows()) === 'E2EBED01:2|E2ESHT01:1');
-  check('and Add to GRN is enabled', await applyEnabled());
-  await shot('scan-1-auto-open.png');
+  run.check('an upload with no field selected opens the dialog by itself', await dialogOpen());
+  run.check('each code lands on its own line', (await boxLines()) === 3);
+  run.check('the preview counts each product', (await rows()) === 'E2EBED01:2|E2ESHT01:1');
+  run.check('and Add to GRN is enabled', await applyEnabled());
+  await run.shot('scan-1-auto-open.png');
 
-  await js(`document.getElementById('scan_clear').click()`);
-  await scanner(['E2EBED01', 'E2EBED01'], 'Tab');
+  await run.js(`document.getElementById('scan_clear').click()`);
+  await run.scanner(['E2EBED01', 'E2EBED01'], 'Tab');
   await sleep(1500);
-  check('a Tab suffix also gives one code per line (the focus stays)', (await boxLines()) === 2 && (await js(`document.activeElement.id`)) === 'scan_capture');
-  check('and is counted', (await rows()) === 'E2EBED01:2');
+  run.check('a Tab suffix also gives one code per line (the focus stays)', (await boxLines()) === 2 && (await run.js(`document.activeElement.id`)) === 'scan_capture');
+  run.check('and is counted', (await rows()) === 'E2EBED01:2');
 
-  await js(`document.getElementById('scan_clear').click()`);
-  await send('Input.insertText', { text: 'E2EBED01E2EBED01E2ESHT01' });
-  await press('Enter');
+  await run.js(`document.getElementById('scan_clear').click()`);
+  await run.insertText('E2EBED01E2EBED01E2ESHT01');
+  await run.press('Enter');
   await sleep(1500);
-  check('codes run together are split on the shop\'s barcodes', (await rows()) === 'E2EBED01:2|E2ESHT01:1');
+  run.check('codes run together are split on the shop\'s barcodes', (await rows()) === 'E2EBED01:2|E2ESHT01:1');
 
-  await scanner(['NOPE123'], 'Enter');
+  await run.scanner(['NOPE123'], 'Enter');
   await sleep(1500);
-  check('an unknown code is a problem line', (await js(`[...document.querySelectorAll('#scan_preview tbody tr')].some(tr => tr.cells[0].textContent.trim() === 'NOPE123' && tr.textContent.includes('Problem'))`)));
-  check('and Add to GRN waits until it is left out', !(await applyEnabled()));
-  await shot('scan-2-problem.png');
-  await js(`[...document.querySelectorAll('.scan-leave-out')].find(b => b.dataset.key === 'NOPE123').click()`);
+  run.check('an unknown code is a problem line', await run.js(`[...document.querySelectorAll('#scan_preview tbody tr')].some(tr => tr.cells[0].textContent.trim() === 'NOPE123' && tr.textContent.includes('Problem'))`));
+  run.check('and Add to GRN waits until it is left out', !(await applyEnabled()));
+  await run.shot('scan-2-problem.png');
+  await run.js(`[...document.querySelectorAll('.scan-leave-out')].find(b => b.dataset.key === 'NOPE123').click()`);
   await sleep(1500);
-  check('Leave out enables Add to GRN again', await applyEnabled());
+  run.check('Leave out enables Add to GRN again', await applyEnabled());
 
-  await js(`document.getElementById('scan_apply').click()`);
+  await run.js(`document.getElementById('scan_apply').click()`);
   await sleep(2500);
-  check('Add to GRN confirms what it added', dialogs.includes('Added 2 product(s), 3 item(s) to E2E-GRN.'));
-  check('the dialog closes', !(await dialogOpen()));
-  check('the GRN table shows the new lines', await js(`document.getElementById('tbl_grn_details').textContent.includes('E2EBED01') && document.getElementById('tbl_grn_details').textContent.includes('e2e Bedsheet')`));
-  await shot('scan-3-added.png');
+  run.check('Add to GRN confirms what it added', run.dialogs.includes('Added 2 product(s), 3 item(s) to E2E-GRN.'));
+  run.check('the dialog closes', !(await dialogOpen()));
+  run.check('the GRN table shows the new lines', await run.js(`document.getElementById('tbl_grn_details').textContent.includes('E2EBED01') && document.getElementById('tbl_grn_details').textContent.includes('e2e Bedsheet')`));
+  await run.shot('scan-3-added.png');
 
   console.log('Transfer - sending');
-  await go(`${BASE}/Public/transfer-details.php?id=${fx.transfer}`);
-  check('the sending shop\'s transfer page shows Scan / Upload', await js(`!!document.querySelector('.btn-scan-upload')`));
-  await js(`document.querySelector('.btn-scan-upload').click()`);
-  await scanner(['E2EBED01', 'E2EBED01', 'E2EBED01'], 'Enter');
+  await run.go(`${BASE}/Public/transfer-details.php?id=${fx.transfer}`);
+  run.check('the sending shop\'s transfer page shows Scan / Upload', await run.js(`!!document.querySelector('.btn-scan-upload')`));
+  await run.js(`document.querySelector('.btn-scan-upload').click()`);
+  await run.scanner(['E2EBED01', 'E2EBED01', 'E2EBED01'], 'Enter');
   await sleep(1500);
-  check('the preview shows the stock and the batch it comes from',
-    (await js(`[...document.querySelectorAll('#scan_preview tbody tr')].map(tr => [...tr.cells].slice(0, 5).map(td => td.textContent.trim()).join('/')).join('|')`))
+  run.check('the preview shows the stock and the batch it comes from',
+    (await run.js(`[...document.querySelectorAll('#scan_preview tbody tr')].map(tr => [...tr.cells].slice(0, 5).map(td => td.textContent.trim()).join('/')).join('|')`))
       === 'E2EBED01/e2e Bed/3/10/E2EB1 × 3');
-  check('and Add to Transfer is enabled', await applyEnabled());
-  await shot('scan-4-transfer.png');
-  await js(`document.getElementById('scan_apply').click()`);
+  run.check('and Add to Transfer is enabled', await applyEnabled());
+  await run.shot('scan-4-transfer.png');
+  await run.js(`document.getElementById('scan_apply').click()`);
   await sleep(2500);
-  check('Add to Transfer confirms what it added', dialogs.includes('Added 1 product(s), 3 item(s) to E2E-T1.'));
-  check('and the transfer table shows the line', await js(`document.getElementById('tbl_transfer_detail').textContent.includes('e2e Bed')`));
+  run.check('Add to Transfer confirms what it added', run.dialogs.includes('Added 1 product(s), 3 item(s) to E2E-T1.'));
+  run.check('and the transfer table shows the line', await run.js(`document.getElementById('tbl_transfer_detail').textContent.includes('e2e Bed')`));
 
   console.log('Transfer - receiving');
-  await go(`${BASE}/Public/logout.php`);
-  await go(`${BASE}/Public/login.php`);
-  await submit(`document.getElementById('user_name').value='e2e_bob';document.getElementById('user_pwd').value=${JSON.stringify(fx.password)};document.querySelector('input[name=btn_log_in]').click()`);
-  await js(`document.querySelector('.synnex-shop[data-shop-id="${fx.shops.S}"]').click()`);
-  await sleep(800);
-  await submit(`document.getElementById('shop_user_pwd').value=${JSON.stringify(fx.password)};document.querySelector('input[name=btn_shop_login]').click()`);
-  await go(`${BASE}/Public/transfer-details.php?id=${fx.transfer}`);
-  check('the receiving shop sees Scan received items', (await js(`document.querySelector('.btn-scan-upload')?.textContent.trim()`)) === 'Scan received items');
-  await js('document.activeElement && document.activeElement.blur()');
-  await scanner(['E2EBED01', 'E2EBED01'], 'Enter');
+  await run.signIn('e2e_bob', fx.shops.S);
+  await run.go(`${BASE}/Public/transfer-details.php?id=${fx.transfer}`);
+  run.check('the receiving shop sees Scan received items', (await run.js(`document.querySelector('.btn-scan-upload')?.textContent.trim()`)) === 'Scan received items');
+  await run.js('document.activeElement && document.activeElement.blur()');
+  await run.scanner(['E2EBED01', 'E2EBED01'], 'Enter');
   await sleep(1500);
-  check('the preview compares sent, scanned and received',
-    (await js(`[...document.querySelectorAll('#scan_preview tbody tr')].map(tr => [...tr.cells].slice(2, 6).map(td => td.textContent.trim()).join('/')).join('|')`))
+  run.check('the preview compares sent, scanned and received',
+    (await run.js(`[...document.querySelectorAll('#scan_preview tbody tr')].map(tr => [...tr.cells].slice(2, 6).map(td => td.textContent.trim()).join('/')).join('|')`))
       === '3/2/2/Check Short 1');
-  await shot('scan-5-receive.png');
-  const before = dialogs.length;
-  await js(`document.getElementById('scan_apply').click()`);
+  await run.shot('scan-5-receive.png');
+  const before = run.dialogs.length;
+  await run.js(`document.getElementById('scan_apply').click()`);
   await sleep(3000);
-  check('a shortage is confirmed first, then applied', dialogs[before] === '1 item(s) short. They stay in the sending shop. Apply the received quantities?'
-    && dialogs[before + 1] === 'Received quantities set on E2E-T1: 2 item(s) received, 1 short.');
+  run.check('a shortage is confirmed first, then applied', run.dialogs[before] === '1 item(s) short. They stay in the sending shop. Apply the received quantities?'
+    && run.dialogs[before + 1] === 'Received quantities set on E2E-T1: 2 item(s) received, 1 short.');
 
-  // scenarios of later tasks are added above this line
-  // errors from the scripts this feature uses or changed; others are listed but were there before
-  // (e.g. the transfer page loads the home page's chart script, which finds no charts)
-  const OURS = /scan_upload\.js|grn_detail\.js|transfer_details\.js/;
-  const ours = exceptions.filter((e) => OURS.test(e));
-  check('no JavaScript errors from the scanner dialog or the GRN / transfer scripts', ours.length === 0);
-  for (const e of ours) console.log('        ' + e);
-  const others = [...new Set(exceptions.filter((e) => !OURS.test(e)).map((e) => e.split('\n')[0]))];
-  if (others.length) console.log('  note  errors from other scripts (not changed here): ' + others.join('; '));
+  run.checkScripts('no JavaScript errors from the scanner dialog or the GRN / transfer scripts', /scan_upload\.js|grn_detail\.js|transfer_details\.js/);
 } catch (e) {
-  failures++;
-  console.log('  FAIL  ' + (e.stack || e));
-} finally {
-  try { await go(`${BASE}/Public/logout.php`); } catch { /* browser gone */ }
-  ws?.close();
-  chrome.kill();
-  process.stdout.write(fixtures('down'));
+  failure = e;
 }
-console.log(failures === 0 ? '\nAll UI checks passed.' : `\n${failures} UI check(s) FAILED.`);
-process.exit(failures === 0 ? 0 : 1);
+await run.finish(failure);

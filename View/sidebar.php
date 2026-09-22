@@ -154,6 +154,7 @@ if ($userType != 1) {
                   <span class="hide-menu">Sales Return</span>
                 </a>
               </li>
+              <?php include __DIR__ . '/menu-customer-orders.php'; ?>
             </ul>
           </li>
           <li class="sidebar-item">
@@ -1322,6 +1323,7 @@ if ($userType != 1) {
             <?php
             }
             ?>
+            <?php include __DIR__ . '/menu-customer-orders.php'; ?>
           </ul>
         </li>
       <?php

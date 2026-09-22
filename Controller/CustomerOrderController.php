@@ -16,6 +16,13 @@ function order_respond($status, array $body)
     exit;
 }//respond
 
+//a done action: the page reloads and shows its message once (View/customer_order_helpers.php co_flash)
+function order_done($message, array $more = [])
+{
+    $_SESSION['co_flash'] = ['ok' => true, 'text' => $message];
+    order_respond(200, ['ok' => true, 'message' => $message] + $more);
+}//done
+
 if(!isset($_SESSION['user_id'], $_SESSION['shop_id']) || !(new ShopAccess())->canAccessShop($_SESSION['user_id'], $_SESSION['shop_id']))
 {
     order_respond(403, ['ok' => false, 'message' => 'Please sign in to the shop again.']);
@@ -43,28 +50,28 @@ try
     {
         case 'create':
             $placed = $orders->create($shop_id, $user_id, $order());
-            order_respond(200, ['ok' => true, 'message' => 'Order ' . $placed['order_no'] . ' sent.', 'id' => $placed['id'], 'order_no' => $placed['order_no']]);
+            order_done('Order ' . $placed['order_no'] . ' sent.', ['id' => $placed['id'], 'order_no' => $placed['order_no']]);
         case 'update':
             $orders->update($id, $shop_id, $user_id, $order());
-            order_respond(200, ['ok' => true, 'message' => 'Order saved.', 'id' => $id]);
+            order_done('Order saved.', ['id' => $id]);
         case 'cancel':
             $orders->cancel($id, $shop_id, $user_id);
-            order_respond(200, ['ok' => true, 'message' => 'Order cancelled.']);
+            order_done('Order cancelled.');
         case 'accept':
             $orders->accept($id, $shop_id, $user_id);
-            order_respond(200, ['ok' => true, 'message' => 'Order accepted.']);
+            order_done('Order accepted.');
         case 'reject':
             $orders->reject($id, $shop_id, $user_id, $field('reason'));
-            order_respond(200, ['ok' => true, 'message' => 'Order rejected.']);
+            order_done('Order rejected.');
         case 'create_transfer':
             $made = $orders->createTransfer($id, $shop_id, $user_id);
-            order_respond(200, ['ok' => true, 'message' => $made['message'], 'transfer_id' => $made['transfer_id'], 'transfer_no' => $made['transfer_no']]);
+            order_done($made['message'], ['transfer_id' => $made['transfer_id'], 'transfer_no' => $made['transfer_no']]);
         case 'custom_sent':
             $orders->markCustomSent($id, $shop_id, $user_id, (int)$field('line_id'), $field('qty'), $field('note'));
-            order_respond(200, ['ok' => true, 'message' => 'Marked sent.']);
+            order_done('Marked sent.');
         case 'handover':
             $orders->handover($id, $shop_id, $user_id, $field('invoice_no'));
-            order_respond(200, ['ok' => true, 'message' => 'Order handed over.']);
+            order_done('Order handed over.');
         case 'products':
             if(!$orders->can($user_id, $shop_id, CustomerOrders::CHANGE))
             {
