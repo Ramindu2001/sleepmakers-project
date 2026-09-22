@@ -7,6 +7,10 @@ db/*
 !db/barcode_module.sql
 !db/barcode_module_install.php
 !db/BARCODE_MODULE.md
+!db/shop_access_migration.php
+!db/shop_access_install.php
+!db/shop_access_module.sql
+!db/SHOP_ACCESS_MODULE.md
 /*.sql
 
 .env

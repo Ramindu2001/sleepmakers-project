@@ -18,11 +18,17 @@ abstract class DatabaseTestCase extends TestCase
 {
     protected PDO $pdo;
 
+    //run the shop access migration after loading the legacy schema (its own tests turn it off)
+    protected $migrate = true;
+
     protected function setUp(): void
     {
         parent::setUp();
         $this->pdo = (new TestDbh())->pdo();
         $this->resetSchema();
+        if ($this->migrate) {
+            (new ShopAccessMigration($this->pdo))->run();
+        }//migrated schema
     }//setUp
 
     private function resetSchema()
@@ -104,4 +110,15 @@ abstract class DatabaseTestCase extends TestCase
     {
         return $this->insert('usermoduleaccess', ['SysModules_SMID' => $module_id, 'UserRoles_URID' => $role_id]);
     }//allowModule
+
+    //assign a user to a shop with a role (needs the migrated schema)
+    protected function assign($user_id, $shop_id, $role_id, $active = true)
+    {
+        return $this->insert('shopusers', [
+            'shop_SHID' => $shop_id,
+            'user_USID' => $user_id,
+            'UserRoles_URID' => $role_id,
+            'is_active' => $active ? 1 : 0,
+        ]);
+    }//assign
 }//DatabaseTestCase

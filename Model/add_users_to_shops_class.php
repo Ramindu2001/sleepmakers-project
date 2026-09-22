@@ -15,7 +15,9 @@ class AddUsersModels extends Dbh
                 return "User already assigned to this shop";
             }
 
-            $sql = "INSERT INTO shopusers (shop_SHID, user_USID) VALUES (?, ?)";
+            //the user's default role becomes their role in this shop
+            $sql = "INSERT INTO shopusers (shop_SHID, user_USID, UserRoles_URID)
+            SELECT ?, USID, UserRoles_URID FROM user WHERE USID = ?";
             $stmt = $this->connect()->prepare($sql);
             $stmt->execute([$shop_SHID, $user_USID]);
             $run = 1;
