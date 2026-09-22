@@ -26,6 +26,7 @@ require_once __DIR__ . '/../Model/shop_access_class.php';
 require_once __DIR__ . '/../Model/add_users_to_shops_class.php';
 require_once __DIR__ . '/../db/shop_access_migration.php';
 require_once __DIR__ . '/../db/scan_upload_migration.php';
+require_once __DIR__ . '/../db/customer_orders_migration.php';
 require_once __DIR__ . '/../Includes/scan_upload.php';
 require_once __DIR__ . '/../Includes/csrf.php';
 require_once __DIR__ . '/../Includes/shop_session.php';

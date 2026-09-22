@@ -208,7 +208,7 @@ class CustomerOrdersMigration
 
 `db/customer_orders_install.php`: same shape as `db/scan_upload_install.php` (CLI only, BOM-safe config load, `CustomerOrdersInstaller extends Dbh` exposing `pdo()`, prints "Customer orders installer", the database name and each report line, `[FAILED]` + exit 1 on `PDOException`).
 
-`db/customer_orders.sql`: the two `CREATE TABLE IF NOT EXISTS` statements, the `ALTER TABLE transferheader ADD COLUMN IF NOT EXISTS CustomerOrderID ...` plus `ADD KEY IF NOT EXISTS idx_transferheader_customerorder (CustomerOrderID)` (MariaDB syntax), and an `INSERT INTO sysfeatures ... SELECT GREATEST(101, COALESCE(MAX(SFID),0)+1), 'Customer Orders', 2, GREATEST(101, COALESCE(MAX(SFID),0)+1) FROM sysfeatures WHERE NOT EXISTS (SELECT 1 FROM sysfeatures WHERE FeatureName = 'Customer Orders')`.
+`db/customer_orders.sql`: the two `CREATE TABLE IF NOT EXISTS` statements, the `ALTER TABLE transferheader ADD COLUMN IF NOT EXISTS CustomerOrderID ...` plus `ADD KEY IF NOT EXISTS idx_transferheader_customerorder (CustomerOrderID)` (MariaDB syntax), and an `INSERT INTO sysfeatures ... SELECT next_id, 'Customer Orders', 2, next_id FROM (SELECT GREATEST(101, COALESCE(MAX(SFID),0)+1) AS next_id FROM sysfeatures) t WHERE NOT EXISTS (SELECT 1 FROM sysfeatures WHERE FeatureName = 'Customer Orders')` - the guard outside the aggregate (an aggregate returns a row even when nothing matches; checked by running the file twice).
 
 `tests/bootstrap.php`: `require_once __DIR__ . '/../db/customer_orders_migration.php';`. `tests/DatabaseTestCase.php` `setUp()`: run `(new CustomerOrdersMigration($this->pdo))->run();` after the scanner migration. `.gitignore`: the four new `!db/...` lines.
 

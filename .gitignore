@@ -15,6 +15,10 @@ db/*
 !db/scan_upload_install.php
 !db/scan_upload.sql
 !db/SCAN_UPLOAD_MODULE.md
+!db/customer_orders_migration.php
+!db/customer_orders_install.php
+!db/customer_orders.sql
+!db/CUSTOMER_ORDERS_MODULE.md
 /*.sql
 
 .env

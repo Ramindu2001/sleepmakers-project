@@ -18,7 +18,7 @@ abstract class DatabaseTestCase extends TestCase
 {
     protected PDO $pdo;
 
-    //run the shop access and scanner upload migrations after loading the schema (the
+    //run the shop access, scanner upload and customer orders migrations after loading the schema (the
     //migrations' own tests turn it off)
     protected $migrate = true;
 
@@ -30,6 +30,7 @@ abstract class DatabaseTestCase extends TestCase
         if ($this->migrate) {
             (new ShopAccessMigration($this->pdo))->run();
             (new ScanUploadMigration($this->pdo))->run();
+            (new CustomerOrdersMigration($this->pdo))->run();
         }//migrated schema
     }//setUp
 
