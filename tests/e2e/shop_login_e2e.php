@@ -72,6 +72,13 @@ class E2EBrowser
         })));
     }
 
+    //one field of a JSON answer, or null when the answer is not JSON
+    public function json($key)
+    {
+        $data = json_decode($this->body, true);
+        return is_array($data) && array_key_exists($key, $data) ? $data[$key] : null;
+    }
+
     public function isOn($page) { return strpos(parse_url($this->url, PHP_URL_PATH), '/' . $page) !== false; }
     public function has($text) { return strpos($this->body, $text) !== false; }
 
@@ -330,6 +337,45 @@ try {
     check('but not once her access to it was revoked', $b->isOn('Public/dashboard.php'), $b);
     $fx->setActive('alice', 'W', 1);
     $b->get('Public/logout.php');
+
+    echo "Assign Users to Shops\n";
+    $endpoint = 'Controller/AddUsersToShopsController.php';
+    signIn($b, 'e2e_alice', $pw);
+    shopLogin($b, $W, 'e2e_alice', $pw);
+    $b->post($endpoint, ['action' => 'set_active', 'suid' => $fx->suid('alice', 'W'), 'active' => 0]);
+    check('a normal user cannot change shop access (403)', $b->status === 403, $b);
+    $b->get('Public/AssignUsersToShops.php');
+    check('a normal user cannot open the admin screen', $b->isOn('Public/home.php') && !$b->has('<th>Access</th>'), $b);
+
+    signIn($b, 'e2e_admin', $pw);
+    shopLogin($b, $W, 'e2e_admin', $pw);
+    $b->get('Public/AssignUsersToShops.php');
+    $token = $b->csrf();
+    check('the admin screen shows role and access columns', $b->has('<th>Role</th>') && $b->has('<th>Access</th>') && $token !== '', $b);
+    checkClean('the admin screen', $b);
+
+    $b->post($endpoint, ['action' => 'save', 'shop_id' => $W, 'user_id' => $fx->users['bob'], 'role_id' => $fx->roles['cashier']]);
+    check('a request without the CSRF token is refused (400)', $b->status === 400, $b);
+
+    $b->post($endpoint, ['action' => 'save', 'shop_id' => $W, 'user_id' => $fx->users['bob'], 'role_id' => $fx->roles['cashier'], 'csrf_token' => $token]);
+    check('admin assigns bob to the warehouse as Cashier', $b->status === 200 && $b->json('ok') === true, $b);
+    $b->post($endpoint, ['action' => 'save', 'shop_id' => $W, 'user_id' => $fx->users['bob'], 'role_id' => $fx->roles['keeper'], 'csrf_token' => $token]);
+    check('assigning him twice is refused', $b->status === 409, $b);
+    $b->post($endpoint, ['action' => 'save', 'shop_id' => $S, 'user_id' => $fx->users['carol'], 'role_id' => $fx->roles['retired'], 'csrf_token' => $token]);
+    check('an inactive role cannot be given', $b->status === 422, $b);
+
+    $bobW = $fx->suid('bob', 'W');
+    $b->post($endpoint, ['action' => 'update_role', 'suid' => $bobW, 'role_id' => $fx->roles['keeper'], 'csrf_token' => $token]);
+    check('admin changes bob\'s warehouse role', $b->json('ok') === true, $b);
+    $b->post($endpoint, ['action' => 'set_active', 'suid' => $bobW, 'active' => 0, 'csrf_token' => $token]);
+    check('admin revokes bob\'s warehouse access', $b->json('message') === 'Access revoked.', $b);
+
+    $bob = new E2EBrowser($base);
+    signIn($bob, 'e2e_bob', $pw);
+    check('bob is back to one shop and goes straight in', $bob->isOn('Public/home.php'), $bob);
+
+    $b->post($endpoint, ['action' => 'delete', 'suid' => $bobW, 'csrf_token' => $token]);
+    check('an assignment without history can be deleted', $b->json('ok') === true && $fx->suid('bob', 'W') === 0, $b);
 
     //scenarios of later tasks are added above this line
 } finally {

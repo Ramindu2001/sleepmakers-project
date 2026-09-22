@@ -33,6 +33,74 @@ class AddUsersModels extends Dbh
         }
     }
 
+    //assign a user to a shop with the role they will hold there. Returns 'assigned', or
+    //'exists' when they are already assigned to that shop (change the role with updateRole).
+    //Unlike the older methods here this one throws PDOException - the JSON controller
+    //(Controller/AddUsersToShopsController.php) turns it into an answer.
+    public function assignUser($shop_SHID, $user_USID, $role_id)
+    {
+        $pdo = $this->connect();
+        $check = $pdo->prepare("SELECT COUNT(*) FROM shopusers WHERE shop_SHID = ? AND user_USID = ?");
+        $check->execute([$shop_SHID, $user_USID]);
+        if ($check->fetchColumn() > 0) {
+            return 'exists';
+        }//already assigned
+
+        try {
+            $stmt = $pdo->prepare("INSERT INTO shopusers (shop_SHID, user_USID, UserRoles_URID, is_active) VALUES (?, ?, ?, 1)");
+            $stmt->execute([$shop_SHID, $user_USID, $role_id]);
+        } catch (PDOException $e) {
+            if (isset($e->errorInfo[1]) && $e->errorInfo[1] == 1062) {
+                return 'exists';
+            }//assigned by someone else a moment ago (uq_shopusers_shop_user)
+            throw $e;
+        }//catch
+        return 'assigned';
+    }//assignUser
+
+    //the role the user holds in the shop of this assignment
+    public function updateRole($SUID, $role_id)
+    {
+        $stmt = $this->connect()->prepare("UPDATE shopusers SET UserRoles_URID = ? WHERE SUID = ?");
+        $stmt->execute([$role_id, $SUID]);
+    }//updateRole
+
+    //revoke (0) or restore (1) access; the assignment and its history stay
+    public function setActive($SUID, $active)
+    {
+        $stmt = $this->connect()->prepare("UPDATE shopusers SET is_active = ? WHERE SUID = ?");
+        $stmt->execute([$active ? 1 : 0, $SUID]);
+    }//setActive
+
+    public function isActiveRole($role_id)
+    {
+        $stmt = $this->connect()->prepare("SELECT 1 FROM userroles WHERE URID = ? AND ur_status = 1");
+        $stmt->execute([$role_id]);
+        return $stmt->fetch() !== false;
+    }//isActiveRole
+
+    public function shopExists($shop_id)
+    {
+        $stmt = $this->connect()->prepare("SELECT 1 FROM shop WHERE SHID = ?");
+        $stmt->execute([$shop_id]);
+        return $stmt->fetch() !== false;
+    }//shopExists
+
+    public function userExists($user_id)
+    {
+        $stmt = $this->connect()->prepare("SELECT 1 FROM user WHERE USID = ?");
+        $stmt->execute([$user_id]);
+        return $stmt->fetch() !== false;
+    }//userExists
+
+    //the roles an assignment may be given
+    public function getActiveRoles()
+    {
+        $stmt = $this->connect()->prepare("SELECT URID, UserRoleName FROM userroles WHERE ur_status = 1 ORDER BY UserRoleName");
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }//getActiveRoles
+
     public function getShops()
     {
         try {
@@ -49,7 +117,8 @@ class AddUsersModels extends Dbh
     public function getUsers()
     {
         try {
-            $stmt = $this->connect()->prepare("SELECT USID, UserName FROM user");
+            //UserRoles_URID: the user's default role, offered when they are added to a shop
+            $stmt = $this->connect()->prepare("SELECT USID, UserName, UserRoles_URID FROM user");
             $stmt->execute();
             $Users = $stmt->fetchAll();
             return $Users;
@@ -62,7 +131,13 @@ class AddUsersModels extends Dbh
     public function getAssignedUsers()
     {
         try {
-            $stmt = $this->connect()->prepare("SELECT su.SUID, s.ShopName, u.UserName FROM shopusers su, shop s, user u WHERE su.shop_SHID = s.SHID AND su.user_USID = u.USID");
+            $stmt = $this->connect()->prepare("SELECT su.SUID, su.shop_SHID, su.user_USID, su.UserRoles_URID, su.is_active,
+                s.ShopName, u.UserName, ur.UserRoleName
+                FROM shopusers su
+                INNER JOIN shop s ON s.SHID = su.shop_SHID
+                INNER JOIN user u ON u.USID = su.user_USID
+                LEFT JOIN userroles ur ON ur.URID = su.UserRoles_URID
+                ORDER BY s.ShopName, u.UserName");
             $stmt->execute();
             $Users = $stmt->fetchAll();
             return $Users;

@@ -1,18 +1,13 @@
 <?php
 include "../Includes/includes.php";
 include '../Includes/authcheck.php';
-if($userObj->checkusertype($_SESSION["user_id"])==1)
+require_once "../Includes/csrf.php";
+if($userObj->checkusertype($_SESSION["user_id"])!=1)
 {
-
-}
-else
-{
-    ?>
-    <script>
-        window.location.href = "../Public/home.php";
-    </script>
-    <?php
-}
+    //decided here, not by a script in the page: the page must not reach anyone else at all
+    header("Location: ../Public/home.php");
+    exit;
+}//super admins only
 
 ?>
 
@@ -47,9 +42,11 @@ else
                 <?php include '../View/header.php'; ?>
                 <div class="container-fluid">
                     <h5 class="card-title fw-semibold mb-4">Assign Users to Shops</h5>
+                    <p class="mb-3">Each row lets one user into one shop, with the role they hold in that shop. Revoke blocks access but keeps the row and its history.</p>
 
                     <button type="button" class="btn btn-primary rounded-pill ml-1 mb-2"
-                        id="btn_Add_SysFeature_modal" data-bs-dismiss="modal">Add New Users</button>
+                        id="btn_Add_SysFeature_modal">Add New Users</button>
+                    <input type="hidden" id="assign_csrf_token" value="<?=htmlspecialchars(csrf_token())?>">
                     <br>
                     <div class="card">
                         <div class="card-body">
@@ -63,20 +60,36 @@ else
                                                     <th>ID</th>
                                                     <th>Shop</th>
                                                     <th>User</th>
+                                                    <th>Role</th>
+                                                    <th>Access</th>
+                                                    <th>Action</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 <?php
                                                 $ShopObj = new AddUsersModels();
-                                                $ShopName = $ShopObj->getAssignedUsers();
-                                                foreach ($ShopName as $Shop): ?>
-                                                    <tr>
+                                                foreach ($ShopObj->getAssignedUsers() as $Shop): ?>
+                                                    <tr data-suid="<?php echo $Shop['SUID']; ?>" data-shop-id="<?php echo $Shop['shop_SHID']; ?>"
+                                                        data-user-id="<?php echo $Shop['user_USID']; ?>" data-role-id="<?php echo $Shop['UserRoles_URID']; ?>">
                                                         <td><?php echo $Shop['SUID']; ?></td>
-                                                        <td><?php echo $Shop['ShopName']; ?></td>
-                                                        <td><?php echo $Shop['UserName']; ?></td>
+                                                        <td><?php echo htmlspecialchars($Shop['ShopName']); ?></td>
+                                                        <td><?php echo htmlspecialchars($Shop['UserName']); ?></td>
+                                                        <td><?php echo $Shop['UserRoleName'] !== null ? htmlspecialchars($Shop['UserRoleName']) : '<span class="text-danger">No role</span>'; ?></td>
                                                         <td>
-                                                        <a class="btn-delete"
-                                                        data-suid="<?php echo $Shop['SUID']; ?>">Delete</a>
+                                                            <?php if ($Shop['is_active'] == 1) { ?>
+                                                                <span class="mb-1 badge text-bg-success">Active</span>
+                                                            <?php } else { ?>
+                                                                <span class="mb-1 badge bg-danger">Revoked</span>
+                                                            <?php } ?>
+                                                        </td>
+                                                        <td>
+                                                            <a href="javascript:void(0)" class="btn-edit-assignment me-2" title="Edit Role"><i class="ti ti-edit"></i></a>
+                                                            <?php if ($Shop['is_active'] == 1) { ?>
+                                                                <a href="javascript:void(0)" class="btn-set-active text-warning me-2" data-active="0" title="Revoke Access"><i class="ti ti-user-off"></i></a>
+                                                            <?php } else { ?>
+                                                                <a href="javascript:void(0)" class="btn-set-active text-success me-2" data-active="1" title="Restore Access"><i class="ti ti-user-check"></i></a>
+                                                            <?php } ?>
+                                                            <a href="javascript:void(0)" class="btn-delete text-danger" title="Delete"><i class="ti ti-trash"></i></a>
                                                         </td>
                                                     </tr>
                                                 <?php endforeach; ?>
