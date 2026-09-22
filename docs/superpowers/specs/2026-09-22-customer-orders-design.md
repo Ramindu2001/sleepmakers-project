@@ -168,3 +168,17 @@ edit, Verify) with the usual *Transfer Note* rights.
 One commit and push per step on `development`. Deploy: back up, run
 `php db/customer_orders_install.php`, upload the code, grant *Customer Orders* in the role
 editor to the roles that need it.
+
+## 10. Found while building
+
+- `db/customer_orders.sql` first guarded the role-right insert with `WHERE NOT EXISTS` on an
+  aggregate `SELECT`; an aggregate returns a row even when nothing matches, so a second run
+  failed on a duplicate id. The guard now sits outside the aggregate; the file was run twice
+  against a scratch database.
+- Locking an order uses `SELECT ... FOR UPDATE` on `customerorders` alone, then reads it with
+  its joins: locking the joined query would also lock the shop and user rows.
+- Stock on other open transfers is counted per batch (inventory row): a transfer that takes
+  more of a batch than it holds does not reduce the other batches.
+- Actions leave a one-time message in the session that the order pages show after reloading.
+- The headless Chrome harness moved to `tests/ui/harness.mjs`, shared by the scanner and the
+  customer orders checks.

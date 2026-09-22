@@ -32,6 +32,9 @@ The project uses a traditional PHP application structure with separate folders f
 - Support for stock calculations and stock value reporting
 - Scanner upload: a batch of scanned barcodes goes into a GRN, a transfer being sent, or the
   received quantities of a transfer, checked and counted per product (see `db/SCAN_UPLOAD_MODULE.md`)
+- Customer orders: a showroom orders from the warehouse what a customer bought but it does not
+  have, recording what was already given so it is never sent twice; the warehouse fulfils it
+  with a transfer created from the order (see `db/CUSTOMER_ORDERS_MODULE.md`)
 
 ### Reporting
 - Inventory reports with stock sale and stock value calculations
@@ -121,7 +124,9 @@ sh tools/get-phpunit.sh                                      # once: downloads P
 C:/xampp/php/php.exe tools/phpunit.phar                      # unit + integration (database sleepmakers_test)
 C:/xampp/php/php.exe tests/e2e/shop_login_e2e.php [base-url] # end to end against a running local site
 C:/xampp/php/php.exe tests/e2e/scan_upload_e2e.php [base-url]
+C:/xampp/php/php.exe tests/e2e/customer_orders_e2e.php [base-url]
 node tests/ui/scan_upload_ui.mjs [screenshot-folder]         # headless Chrome (Node 24+), the scanner dialog
+node tests/ui/customer_orders_ui.mjs [screenshot-folder]     # headless Chrome, the customer order pages
 ```
 
 ## Development Notes
