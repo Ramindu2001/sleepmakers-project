@@ -323,6 +323,11 @@ class E2EStock
         //Store Keeper may change GRNs (feature 2) and transfers (4); Cashier may not
         $this->pdo->prepare("UPDATE userroleaccess SET is_create = 1, is_edit = 1, is_verify = 1
             WHERE UserRolls_URID = ? AND SysFeatures_SFID IN (2, 4)")->execute([$this->fx->roles['keeper']]);
+        //Store Keeper may use Customer Orders (every right) and sees the Orders menu
+        $this->pdo->prepare("UPDATE userroleaccess SET is_view = 1, is_create = 1, is_edit = 1, is_verify = 1
+            WHERE UserRolls_URID = ? AND SysFeatures_SFID = (SELECT SFID FROM sysfeatures WHERE FeatureName = 'Customer Orders' LIMIT 1)")
+            ->execute([$this->fx->roles['keeper']]);
+        $this->pdo->prepare("INSERT INTO usermoduleaccess (SysModules_SMID, UserRoles_URID) VALUES (2, ?)")->execute([$this->fx->roles['keeper']]);
 
         foreach (['bed' => ['E2EBED01', 'e2e Bed', 1000, 1500], 'sheet' => ['E2ESHT01', 'e2e Bedsheet', 200, 350]] as $key => $p) {
             $this->pdo->prepare("INSERT INTO products (Barcode, ItemName, ProdPurchasePrice, ProdSellPrice, ProductStat, ItemType,
@@ -386,6 +391,9 @@ class E2EStock
         $shops = "SELECT SHID FROM shop WHERE ShopName LIKE 'e2e %'";
         $grns = "SELECT GHID FROM grnheader WHERE shop_SHID IN ($shops)";
         $transfers = "SELECT THID FROM transferheader WHERE TransferFrom IN ($shops) OR TransferTo IN ($shops)";
+        $this->pdo->exec("DELETE FROM customerorderlines WHERE customerorders_COID IN
+            (SELECT COID FROM customerorders WHERE shop_SHID IN ($shops) OR SupplierShopID IN ($shops))");
+        $this->pdo->exec("DELETE FROM customerorders WHERE shop_SHID IN ($shops) OR SupplierShopID IN ($shops)");
         $this->pdo->exec("DELETE FROM scanbatches WHERE shop_SHID IN ($shops)");
         $this->pdo->exec("DELETE FROM grndetails WHERE GRNHeader_GHID IN ($grns)");
         $this->pdo->exec("DELETE FROM grnheader WHERE shop_SHID IN ($shops)");
@@ -393,6 +401,11 @@ class E2EStock
         $this->pdo->exec("DELETE FROM transferheader WHERE TransferFrom IN ($shops) OR TransferTo IN ($shops)");
         $this->pdo->exec("DELETE FROM pricehistory WHERE Inventory_INID IN (SELECT INID FROM inventory WHERE shop_SHID IN ($shops))");
         $this->pdo->exec("DELETE FROM inventory WHERE shop_SHID IN ($shops)");
+        //and what a transfer Verify created in the receiving shop: product copies, their variations,
+        //categories and subcategories
+        $this->pdo->exec("DELETE FROM variations WHERE products_PDID IN (SELECT PDID FROM products WHERE shop_SHID IN ($shops))");
         $this->pdo->exec("DELETE FROM products WHERE shop_SHID IN ($shops)");
+        $this->pdo->exec("DELETE FROM subcategories WHERE categories_CTID IN (SELECT CTID FROM categories WHERE shop_SHID IN ($shops))");
+        $this->pdo->exec("DELETE FROM categories WHERE shop_SHID IN ($shops)");
     }
 }//E2EStock
