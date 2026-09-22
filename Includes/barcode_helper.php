@@ -966,7 +966,14 @@ if (!function_exists('bcGetLabelSizes')) {
             return true; //administrator
         }//admin
 
-        $role_id = (int) $rows[0]['UserRoles_URID'];
+        //rights come from the role held in the current shop (Model/shop_access_class.php)
+        require_once __DIR__ . '/../Model/shop_access_class.php';
+        $shop_id = isset($_SESSION['shop_id']) ? $_SESSION['shop_id'] : 0;
+        $role_id = (int) (new ShopAccess())->getShopRoleId($user_id, $shop_id);
+        if ($role_id === 0) {
+            return false;
+        }//no access to this shop
+
         $access = $dbObj->getData("SELECT " . $right . " FROM userroleaccess
                                    WHERE UserRolls_URID = " . $role_id . "
                                      AND SysFeatures_SFID = " . (int) $feature_id . ";");

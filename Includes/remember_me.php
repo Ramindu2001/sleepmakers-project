@@ -19,6 +19,8 @@
 //
 //The secret is Includes/remember_me_secret.php. It is created on first use and kept out of git;
 //deleting it signs every remembered browser out.
+require_once __DIR__ . '/../Model/shop_access_class.php';
+
 class RememberMe extends Dbh
 {
     const USER_COOKIE = 'remember_me_token';
@@ -114,45 +116,11 @@ class RememberMe extends Dbh
         return $token['id'];
     }//shop from cookie
 
-    //may this user open this shop? The same rule that builds the shop list on the dashboard
-    //(Company::getCompanyByUser): UserType 1 opens every shop, everyone else only the active
-    //shops they are assigned to.
+    //may this user open this shop? The one rule lives in ShopAccess (Model/shop_access_class.php):
+    //UserType 1 opens every shop, everyone else only the active shops they hold an active role in.
     public function canAccessShop($user_id, $shop_id)
     {
-        $user_id = filter_var($user_id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        $shop_id = filter_var($shop_id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        if($user_id === false || $shop_id === false)
-        {
-            return false;
-        }//not ids
-
-        $stmt = $this->connect()->prepare("SELECT UserType FROM user WHERE USID = ? AND UserStat = 1;");
-        $stmt->execute([$user_id]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        if($user === false)
-        {
-            return false;
-        }//no such active user
-
-        if($user['UserType'] == 1)
-        {
-            $sql = "SELECT shop.SHID FROM shop
-            INNER JOIN company ON company.CMID = shop.Company_CMID
-            WHERE shop.SHID = ? LIMIT 1;";
-            $params = [$shop_id];
-        }//every shop
-        else
-        {
-            $sql = "SELECT shop.SHID FROM shopusers
-            INNER JOIN shop ON shop.SHID = shopusers.shop_SHID
-            INNER JOIN company ON company.CMID = shop.Company_CMID
-            WHERE shopusers.user_USID = ? AND shopusers.shop_SHID = ? AND shop.ShopStat = 1 LIMIT 1;";
-            $params = [$user_id, $shop_id];
-        }//assigned active shops
-
-        $stmt = $this->connect()->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetch(PDO::FETCH_ASSOC) !== false;
+        return (new ShopAccess())->canAccessShop($user_id, $shop_id);
     }//can access shop
 
     //sign this browser out: the remember-me cookies, and the old ones they replace

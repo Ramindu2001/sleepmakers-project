@@ -26,7 +26,8 @@ $delete = "is_delete";
 $verify = "is_verify";
 $print = "is_print";
 if ($userType != 1) {
-  $userRole_id = $user[0]['UserRoles_URID'];
+  //the role this user holds in the current shop (Model/shop_access_class.php); 0 matches no rights
+  $userRole_id = (int) (new ShopAccess())->getShopRoleId($user_id, $shop_id);
   $modules = $userObj->getUserRoleModuleAccess($userRole_id);
   $userModules = [];
   foreach ($modules as $row) {

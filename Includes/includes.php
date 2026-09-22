@@ -7,6 +7,7 @@ include "../Includes/config.php";
 include "../Model/DB_Class.php";
 
 include "../Model/user_class.php";
+include_once "../Model/shop_access_class.php";
 include "../Model/company_class.php";
 include "../Model/shop_class.php";
 include "../Model/counter_class.php";
