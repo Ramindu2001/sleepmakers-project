@@ -58,6 +58,14 @@ class ShopAccess extends Dbh
         return null;
     }//unavailable reason
 
+    //is this an active system (super) admin? Only they manage users, roles, passwords and shop
+    //access - checked on the server for every such page and request
+    public function isSuperAdmin($user_id)
+    {
+        $user = $this->findActiveUser($user_id);
+        return $user !== null && (int)$user['UserType'] === 1;
+    }//is super admin
+
     //may this user enter this shop?
     public function canAccessShop($user_id, $shop_id)
     {

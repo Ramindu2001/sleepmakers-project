@@ -1,6 +1,17 @@
-<?php 
+<?php
 include "../Includes/includes.php";
 include "../Includes/authcheck.php";
+require_once "../Includes/super_admin.php";
+
+//creating, editing and switching roles on or off is for the system admin only, from our own
+//pages - decided before anything below runs
+super_admin_request();
+if(!posted_csrf_valid())
+{
+    $_SESSION['role_status'] = 6;
+    header("Location:../Public/user-roles.php");
+    exit;
+}//stale or forged form
 
 if (isset($_POST['add-role'])) 
 {

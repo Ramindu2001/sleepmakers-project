@@ -1,14 +1,23 @@
 <?php
 include "../Includes/includes.php";
 require_once "../Includes/remember_me.php";
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\SMTP;
-use PHPMailer\PHPMailer\Exception;
-
-//Load Composer's autoloader
-require '../vendor/autoload.php';
 $userObj = new User();
 $comObj = new Company();
+
+//adding, editing, (de)activating users and resetting their passwords is for the system admin
+//only, from our own pages - decided before anything below runs (Includes/super_admin.php)
+require_once "../Includes/super_admin.php";
+if(array_intersect(['add-user', 'edit-user', 'delete-user', 'activate-user', 'chng-pwd'], array_keys($_POST)))
+{
+    super_admin_request();
+    if(!posted_csrf_valid())
+    {
+        $_SESSION['user_error'] = 11;
+        header("Location: ../Public/users.php");
+        exit;
+    }//stale or forged form
+}//user management
+
 if(isset($_POST['add-user']))
 {
     //fetch data
@@ -312,10 +321,7 @@ else if(isset($_POST['chng-pwd']))
                 $eudi=$_POST['euid'];
                 $epassword=$_POST['epassword'];
                 $ecpassword=$_POST['e-cpassword'];
-                echo $eudi."<br>";
-                echo $epassword."<br>";
-                echo $ecpassword."<br>";
-                if ($epassword==$ecpassword) 
+                if ($epassword==$ecpassword)
                 {
                     
                     $password = password_hash($epassword,PASSWORD_DEFAULT);
@@ -358,58 +364,42 @@ else if(isset($_POST['chng-pwd']))
 }
 else if(isset($_POST['uchng-pwd']))
 {
-    if(!empty($_POST['ueuid']))
+    //a user changes their own password (profile menu): always the signed-in user's own account,
+    //never an id taken from the form, and only with the current password
+    if(!isset($_SESSION['user_id']))
     {
-        if (!empty($_POST['uepassword'])) 
-        {
-            if (!empty($_POST['ue_cpassword'])) 
-            {
-                $eudi=$_POST['ueuid'];
-                $epassword=$_POST['uepassword'];
-                $ecpassword=$_POST['ue_cpassword'];
-                echo $eudi."<br>";
-                echo $epassword."<br>";
-                echo $ecpassword."<br>";
-                if ($epassword==$ecpassword) 
-                {
-                    
-                    $password = password_hash($epassword,PASSWORD_DEFAULT);
-                    $pwd_chang=$userObj->change_password($password,$eudi);
-                    if ($pwd_chang==1) 
-                    {
-                        $_SESSION['user_error']=4;//no username
-                        header("Location: ../Public/home.php");
-                        
-                    }
-                    else
-                    {
-                        $_SESSION['user_error']=5;//no username
-                        header("Location: ../Public/home.php");
-                    }
-                }
-                else
-                {
-                    $_SESSION['user_error']=5;//no username
-                    header("Location: ../Public/home.php");
-                }
-            }
-            else
-            {
-                $_SESSION['user_error']=5;//no username
-                header("Location: ../Public/home.php");
-            }            
-        }
-        else
-        {
-            $_SESSION['user_error']=5;//no username
-            header("Location: ../Public/home.php");
-        }
-    }
+        header("Location: ../Public/login.php");
+        exit;
+    }//not signed in
+
+    $me = $userObj->getOneUser($_SESSION['user_id']);
+    $new_password = isset($_POST['uepassword']) && is_string($_POST['uepassword']) ? $_POST['uepassword'] : '';
+    $confirm_password = isset($_POST['ue_cpassword']) && is_string($_POST['ue_cpassword']) ? $_POST['ue_cpassword'] : '';
+    $current_password = isset($_POST['ue_current_password']) && is_string($_POST['ue_current_password']) ? $_POST['ue_current_password'] : '';
+
+    if(!posted_csrf_valid())
+    {
+        $_SESSION['user_error'] = 11;
+    }//stale or forged form
+    elseif(empty($me) || !password_verify($current_password, $me[0]['UserPwd']))
+    {
+        $_SESSION['user_error'] = 12;
+    }//wrong current password
+    elseif($new_password === '' || $new_password !== $confirm_password)
+    {
+        $_SESSION['user_error'] = 13;
+    }//empty or not confirmed
     else
     {
-        $_SESSION['user_error']=5;//no username
-        header("Location: ../Public/home.php");
-    }
+        $userObj->change_password(password_hash($new_password, PASSWORD_DEFAULT), $me[0]['USID']);
+        if(isset($_SESSION['remember_me']))
+        {
+            (new RememberMe())->rememberUser($me[0]['USID']); //the old token was signed over the old password
+        }//stay remembered in this browser
+        $_SESSION['user_error'] = 4;
+    }//changed
+    header("Location: ../Public/home.php");
+    exit;
 }
 elseif(isset($_POST['btn_log_in']))
 {
@@ -483,74 +473,6 @@ elseif(isset($_POST['btn_log_in']))
         }//signed in
     }//user exists, active, right password
 }//log into system
-elseif ($_POST['btn_password_change']) 
-{
-    if (!empty($_POST['user_name'])) 
-    {
-        $user=$_POST['user_name'];
-        $bytes = random_bytes(20);
-        $token= bin2hex($bytes);
-        $users=$userObj->pwd_chng_user($user);
-        if (empty($users)) 
-        {
-            $_SESSION['user_error']=2;
-            header("Location: ../Public/forget-password.php");
-        }
-        else
-        {
-            $uid=$users[0]["USID"];
-            $email=$users[0]["UserEmail"];
-            $name=$users[0]["UserName"];
-            $update_token=$userObj->update_token($token,$uid);
-            $mail = new PHPMailer(true);
-            $domains="http://localhost/new_cloud_pos/CloudPOS/Public";
-            try{
-                $mail->SMTPDebug = SMTP::DEBUG_SERVER;                      //Enable verbose debug output
-                $mail->isSMTP();                                            //Send using SMTP
-                $mail->Host       = 'mail.synnex.lk';                     //Set the SMTP server to send through
-                $mail->SMTPAuth   = true;                                   //Enable SMTP authentication
-                $mail->Username   = 'digitalmarketing@synnex.lk';                     //SMTP username
-                $mail->Password   = '@@SynnexMathu';                               //SMTP password
-                $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;            //Enable implicit TLS encryption
-                $mail->Port       = 465;                                    //TCP port to connect to; use 587 if you have set `SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS`
-
-                //Recipients
-                $mail->setFrom('noreply@synnexcloudpos.com', 'Synnex Cloud POS');
-                $mail->addAddress($email, $name);     //Add a recipient
-                // $mail->addReplyTo('info@example.com', 'Information');
-                // $mail->addCC('cc@example.com');
-                // $mail->addBCC('bcc@example.com');
-
-                //Attachments
-                // $mail->addAttachment('/var/tmp/file.tar.gz');         //Add attachments
-                // $mail->addAttachment('/tmp/image.jpg', 'new.jpg');    //Optional name
-
-                //Content
-                $mail->isHTML(true);                                  //Set email format to HTML
-                $mail->Subject = 'Password Change - Synnex Cloud POS 1';
-                $mail->Body    = '<h1>Click the link below to change your number</h1>';
-                $mail->Body    .= '<a href="'.$domain.'/change-password.php?token='.$token.'">Change Password</a>';
-                // $mail->AltBody = '<a href="change-password.php?token='.$toekn.'">Change Password</a>';
-                $mail->send();
-                echo 'Message has been sent';
-            }
-            catch (Exception $e) {
-                echo "Message could not be sent. Mailer Error: {$mail->ErrorInfo}";
-            }
-            $_SESSION['user_error']=1;
-            header("Location: ../Public/forget-password.php");
-
-            
-        }
-
-    }
-    else
-    {
-        $_SESSION['user_error']=0;
-        header("Location: ../Public/forget-password.php");
-    }
-}
-
 elseif(isset($_POST['btn_log_out']))
 {
     date_default_timezone_set("Asia/Colombo");

@@ -66,6 +66,21 @@ Assignments whose user no longer exists get role `0` and are revoked; the instal
 Example: to let a store keeper check stock in the Warehouse but not in the showroom, give them a
 role with *Store → View* in the Warehouse row and revoke (or never add) the showroom row.
 
+### Users, roles and passwords - system admin only
+
+Credentials are issued by the company's system (super) admin (`UserType = 1`):
+
+- Only a super admin sees and opens **Users**, **User Roles** and **Assign Users to Shops**. The
+  server turns anyone else away before any of the page is sent (`Includes/super_admin.php`).
+- Every add / edit / (de)activate user, password reset, role create / edit / (de)activate
+  request is checked on the server: it must come from a signed-in super admin and carry the
+  page's CSRF token, or it is refused (403) and nothing changes.
+- A role can no longer grant *Add Users* or *Add User Role*; the role editor does not offer them.
+- A user may still change **their own** password (profile menu → Change Password), and only by
+  entering the current one. The admin can reset anyone's password on the Users page.
+- *Forgot Password?* tells the user to contact the system admin. The old reset-by-email flow
+  never reset a password and has been removed.
+
 ## 4. Deploying
 
 1. Back up the database.

@@ -1,6 +1,8 @@
 <?php 
 include '../Includes/includes.php';
 include '../Includes/authcheck.php';
+require_once '../Includes/super_admin.php';
+super_admin_page(); //system admin only, decided before any of the page is sent
 ?>
 <!doctype html>
 <html lang="en">
@@ -83,6 +85,15 @@ include '../Includes/authcheck.php';
                       <div class="alert alert-success alert-dismissible bg-success text-white border-0 fade show" role="alert">
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
                         <strong>User Role Deactivated!</strong> Successfully
+                      </div>
+                      <?php
+                    }
+                    else if ($_SESSION['role_status']==6)
+                    {
+                      ?>
+                      <div class="alert alert-danger alert-dismissible bg-danger text-white border-0 fade show" role="alert">
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <strong>Your session expired.</strong> Please try again.
                       </div>
                       <?php
                     }
@@ -195,11 +206,13 @@ include '../Includes/authcheck.php';
                                               {
                                                   if ($key['ur_status'] == 1) { ?>
                                                       <form action="../Controller/userrolecontrol.php" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to deactivate this role?');">
+                                                          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
                                                           <input type="hidden" name="delete_role_id" value="<?=$key['URID']?>">
                                                           <button type="submit" name="delete-role" class="btn btn-sm p-0 border-0 bg-transparent text-warning" title="Deactivate Role"><i class="ti ti-user-off"></i></button>
                                                       </form>
                                                   <?php } else { ?>
                                                       <form action="../Controller/userrolecontrol.php" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to activate this role?');">
+                                                          <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
                                                           <input type="hidden" name="activate_role_id" value="<?=$key['URID']?>">
                                                           <button type="submit" name="activate-role" class="btn btn-sm p-0 border-0 bg-transparent text-success" title="Activate Role"><i class="ti ti-user-check"></i></button>
                                                       </form>

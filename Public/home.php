@@ -152,6 +152,33 @@ include '../Includes/authcheck.php';
                       </div>
                       <?php
                     }
+                    else if ($_SESSION['user_error']==11)
+                    {
+                      ?>
+                      <div class="alert alert-danger alert-dismissible bg-danger text-white border-0 fade show" role="alert">
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <strong>Your session expired.</strong> Please try again.
+                      </div>
+                      <?php
+                    }
+                    else if ($_SESSION['user_error']==12)
+                    {
+                      ?>
+                      <div class="alert alert-danger alert-dismissible bg-danger text-white border-0 fade show" role="alert">
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <strong>Password not changed.</strong> Your current password is incorrect.
+                      </div>
+                      <?php
+                    }
+                    else if ($_SESSION['user_error']==13)
+                    {
+                      ?>
+                      <div class="alert alert-danger alert-dismissible bg-danger text-white border-0 fade show" role="alert">
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <strong>Password not changed.</strong> The new passwords are empty or do not match.
+                      </div>
+                      <?php
+                    }
                     unset($_SESSION['user_error']);
                   }
                   ?>

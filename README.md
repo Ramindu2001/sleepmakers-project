@@ -42,6 +42,7 @@ The project uses a traditional PHP application structure with separate folders f
 - Shop-aware data filtering
 - Shop login and per-shop access: each user's role is set per shop, and access to a shop can
   be revoked and restored (see `db/SHOP_ACCESS_MODULE.md`)
+- Users, roles and passwords are managed by the system (super) admin only, enforced on the server
 - User and role validation during login
 
 ## Project Structure

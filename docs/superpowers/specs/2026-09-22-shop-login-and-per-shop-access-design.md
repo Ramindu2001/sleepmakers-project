@@ -295,3 +295,19 @@ the single-shop and remember-me rows of §3 and the matching parts of §5 and §
 - **Remember me keeps only the main sign in.** `RememberMe::rememberShop()` and
   `shopFromCookie()` were removed. `authcheck.php` no longer restores a shop, and
   `dashboard.php` clears a shop cookie left by the earlier version without reading it.
+- **Users, roles and passwords are managed by the system (super) admin only** ("we are the
+  company, we give the credentials"). One server-side rule, `ShopAccess::isSuperAdmin()`
+  (active user, `UserType = 1`), used through `Includes/super_admin.php`:
+  - pages `users.php`, `user-roles.php`, `add-role.php`, `edit-role.php` and
+    `AssignUsersToShops.php` redirect anyone else before sending anything;
+  - `userController.php` (add, edit, delete and activate user, `chng-pwd`),
+    `userrolecontrol.php` and `AJAX/UserRole/data.php` answer anyone else with 403 and require
+    the CSRF token. Before this, all of them accepted requests from anyone, even someone not
+    signed in - including creating a super admin or resetting the admin's password;
+  - the non-admin sidebar no longer shows Users / User Role, and the role editor no longer
+    offers features 20 (*Add Users*) and 54 (*Add User Role*) (`UserRole::ADMIN_ONLY_FEATURES`).
+- **Own password.** `uchng-pwd` always changes the signed-in user's own password (the posted
+  `ueuid` is ignored) and requires the current password and the CSRF token.
+- **Forgot password.** The reset-by-email flow (`btn_password_change`, `change-password.php`)
+  never reset a password, could be triggered by anyone, and held SMTP credentials in the code;
+  it was removed. `forget-password.php` now says to contact the system admin.

@@ -238,6 +238,22 @@ final class ShopAccessTest extends DatabaseTestCase
         $this->assertSame('Oops! Something went wrong', ShopAccess::errorMessage('unknown'));
     }
 
+    // ---- isSuperAdmin ----------------------------------------------------------------------
+
+    public function test_only_an_active_super_admin_is_a_super_admin()
+    {
+        $admin = $this->admin();
+        $alice = $this->createUser('alice', 'x', $this->cashier);
+        $retired = $this->createUser('retired-admin', 'x', $this->cashier, ['UserType' => 1, 'UserStat' => 0]);
+
+        $this->assertTrue($this->access->isSuperAdmin($admin));
+        $this->assertFalse($this->access->isSuperAdmin($alice));
+        $this->assertFalse($this->access->isSuperAdmin($retired));
+        $this->assertFalse($this->access->isSuperAdmin(999999));
+        $this->assertFalse($this->access->isSuperAdmin(null));
+        $this->assertFalse($this->access->isSuperAdmin('1 OR 1=1'));
+    }
+
     public function test_unavailable_reason_follows_company_state()
     {
         $open = ['ComStat' => 1, 'ComExpireDate' => date('Y-m-d')];

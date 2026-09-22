@@ -11,6 +11,7 @@
             </div>
             <div class="modal-body">
                 <form action="../Controller/userController.php" method="POST" id="form-user" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
                     <div class="form-check form-switch mb-3">
                         <input class="form-check-input" type="checkbox" id="status" name="status" value="1">
                         <label class="form-check-label" for="status">Status</label>

@@ -1,6 +1,10 @@
 <?php  
 class UserRole extends Dbh
 {
+    //Add Users and Add User Role: managed by the system (super) admin only (Includes/super_admin.php),
+    //so a role cannot grant them and the role editor does not offer them
+    const ADMIN_ONLY_FEATURES = [20, 54];
+
     Public function select_modules()
     {
         $sql = "SELECT * FROM sysmodules ORDER BY sort_order;";
@@ -32,7 +36,7 @@ class UserRole extends Dbh
     }
     Public function select_features($module_id)
     {
-        $sql = "SELECT * FROM sysfeatures WHERE SystemModules_SMID=? ORDER BY sort_order;";
+        $sql = "SELECT * FROM sysfeatures WHERE SystemModules_SMID=? AND SFID NOT IN (" . implode(',', self::ADMIN_ONLY_FEATURES) . ") ORDER BY sort_order;";
         $stmt = $this->connect()->prepare($sql);
         $stmt->execute([$module_id]);
         return $stmt->fetchAll();   
@@ -65,7 +69,7 @@ class UserRole extends Dbh
     LEFT JOIN 
         userroleaccess ura ON sf.SFID = ura.SysFeatures_SFID AND ura.UserRolls_URID =?
     WHERE
-        sf.SystemModules_SMID = ?
+        sf.SystemModules_SMID = ? AND sf.SFID NOT IN (" . implode(',', self::ADMIN_ONLY_FEATURES) . ")
     ORDER BY sf.sort_order;";
         $stmt = $this->connect()->prepare($sql);
         $stmt->execute([$userrole,$module_id]);

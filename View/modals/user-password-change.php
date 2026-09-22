@@ -11,10 +11,17 @@
             </div>
             <div class="modal-body">
                 <form action="../Controller/userController.php" method="POST" id="form-user" enctype="multipart/form-data">
+                    <?php require_once __DIR__ . '/../../Includes/csrf.php'; ?>
+                    <!-- always the signed-in user's own password (Controller/userController.php, uchng-pwd) -->
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
                     <div class="row">
+                        <div class="col-md-12">
+                            <div class="m-2">
+                                <label for="ue-current-password" class="form-label">Current Password <span class="text-danger">*</span></label>
+                                <input type="password" name="ue_current_password" id="ue-current-password" class="form-control" autocomplete="current-password" required>
+                            </div>
+                        </div>
                         <div class="col-md-6">
-                            <input type="hidden" name="ueuid" id="ue-pwd-change-id" value="<?=$_SESSION['user_id']?>">
-                            <input type="hidden" name="url" value="1">
                             <div class="m-2">
                                 <label for="password" class="form-label">Password <span class="text-danger">*</span></label>
                                 <input type="password" name="uepassword" id="uepassword" class="form-control" required>

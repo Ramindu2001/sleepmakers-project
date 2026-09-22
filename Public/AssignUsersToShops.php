@@ -1,13 +1,8 @@
 <?php
 include "../Includes/includes.php";
 include '../Includes/authcheck.php';
-require_once "../Includes/csrf.php";
-if($userObj->checkusertype($_SESSION["user_id"])!=1)
-{
-    //decided here, not by a script in the page: the page must not reach anyone else at all
-    header("Location: ../Public/home.php");
-    exit;
-}//super admins only
+require_once "../Includes/super_admin.php";
+super_admin_page(); //system admin only, decided before any of the page is sent
 
 ?>
 

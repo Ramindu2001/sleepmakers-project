@@ -103,7 +103,10 @@ class E2EBrowser
 
     public function csrf()
     {
-        return preg_match('/id="(?:shop_login|assign)_csrf_token"[^>]*value="([0-9a-f]{64})"/', $this->body, $m) ? $m[1] : '';
+        if (preg_match('/id="(?:shop_login|assign)_csrf_token"[^>]*value="([0-9a-f]{64})"/', $this->body, $m)) {
+            return $m[1];
+        }
+        return preg_match('/name="csrf_token" value="([0-9a-f]{64})"/', $this->body, $m) ? $m[1] : '';
     }
 
     public function __destruct() { @unlink($this->jar); }
@@ -193,6 +196,44 @@ class E2EFixtures
             WHERE user.UserName = ? AND shopusers.shop_SHID = ?");
         $stmt->execute(['e2e_' . $name, $this->shops[$shop]]);
         return (int) $stmt->fetchColumn();
+    }
+
+    //a user's id by name (without the e2e_ prefix), 0 when there is no such user
+    public function userId($name)
+    {
+        $stmt = $this->pdo->prepare("SELECT USID FROM user WHERE UserName = ?");
+        $stmt->execute(['e2e_' . $name]);
+        return (int) $stmt->fetchColumn();
+    }
+
+    public function passwordIs($name, $password)
+    {
+        $stmt = $this->pdo->prepare("SELECT UserPwd FROM user WHERE UserName = ?");
+        $stmt->execute(['e2e_' . $name]);
+        $hash = $stmt->fetchColumn();
+        return is_string($hash) && password_verify($password, $hash);
+    }
+
+    public function setPassword($name, $password)
+    {
+        $this->pdo->prepare("UPDATE user SET UserPwd = ? WHERE UserName = ?")
+            ->execute([password_hash($password, PASSWORD_DEFAULT), 'e2e_' . $name]);
+    }
+
+    //the password reset token the old forgot-password flow stored, or null
+    public function resetToken($name)
+    {
+        $stmt = $this->pdo->prepare("SELECT PwdChange FROM user WHERE UserName = ?");
+        $stmt->execute(['e2e_' . $name]);
+        $token = $stmt->fetchColumn();
+        return $token === false || $token === null || $token === '' ? null : $token;
+    }
+
+    public function roleActive($key)
+    {
+        $stmt = $this->pdo->prepare("SELECT ur_status FROM userroles WHERE URID = ?");
+        $stmt->execute([$this->roles[$key]]);
+        return (int) $stmt->fetchColumn() === 1;
     }
 
     public function lastLogin($user)
@@ -408,9 +449,80 @@ try {
     $b->get('Public/users.php');
     check('the users page calls the role the Default Role', $b->has('<th>Default Role</th>') && $b->has('Assign Users to Shops.</small>'), $b);
     checkClean('the users page', $b);
+    $usersToken = $b->csrf();
     $b->post('Controller/userController.php', ['add-user' => '1', 'username' => 'e2e_dave', 'userEmail' => 'e2e_dave@example.com',
         'userContact' => '0000000000', 'password' => $pw, 'userRole' => $fx->roles['keeper']]);
+    check('the admin\'s add-user without the CSRF token is refused', $fx->userId('dave') === 0 && $b->has('Your session expired.'), $b);
+    $b->post('Controller/userController.php', ['add-user' => '1', 'username' => 'e2e_dave', 'userEmail' => 'e2e_dave@example.com',
+        'userContact' => '0000000000', 'password' => $pw, 'userRole' => $fx->roles['keeper'], 'csrf_token' => $usersToken]);
     check('a new user joins the current shop with the role chosen for them', $fx->roleOf('dave', 'W') === $fx->roles['keeper'], $b);
+    $b->post('Controller/userController.php', ['chng-pwd' => '1', 'euid' => $fx->userId('dave'), 'epassword' => 'Dave-New-1', 'e-cpassword' => 'Dave-New-1', 'csrf_token' => $usersToken]);
+    check('the admin resets dave\'s password', $fx->passwordIs('dave', 'Dave-New-1'), $b);
+
+    echo "Users and roles: system admin only\n";
+    $anon = new E2EBrowser($base);
+    $anon->post('Controller/userController.php', ['add-user' => '1', 'username' => 'e2e_mallory', 'userEmail' => 'e2e_mallory@example.com',
+        'userContact' => '0000000000', 'password' => $pw, 'userRole' => $fx->roles['keeper'], 'superadmin' => 'on']);
+    check('someone not signed in cannot create a user, let alone a super admin (403)', $anon->status === 403 && $fx->userId('mallory') === 0, $anon);
+    $anon->post('Controller/userController.php', ['chng-pwd' => '1', 'euid' => $fx->users['admin'], 'epassword' => 'owned', 'e-cpassword' => 'owned']);
+    check('someone not signed in cannot reset the admin\'s password', $anon->status === 403 && $fx->passwordIs('admin', $pw), $anon);
+    $anon->post('Controller/userController.php', ['uchng-pwd' => '1', 'ueuid' => $fx->users['admin'], 'uepassword' => 'owned', 'ue_cpassword' => 'owned']);
+    check('nor change it through the profile form', $anon->isOn('Public/login.php') && $fx->passwordIs('admin', $pw), $anon);
+    $anon->post('AJAX/UserRole/data.php', ['id' => $fx->roles['keeper'], 'status' => 0]);
+    check('nor switch a role off (403)', $anon->status === 403 && $fx->roleActive('keeper'), $anon);
+
+    $a = new E2EBrowser($base);
+    signIn($a, 'e2e_alice', $pw);
+    shopLogin($a, $W, 'e2e_alice', $pw);
+    check('a normal user has no Users or User Role menu', !sees($a, 'users.php') && !sees($a, 'user-roles.php'), $a);
+    $aliceToken = $a->csrf();
+    foreach (['users.php', 'user-roles.php', 'add-role.php', 'edit-role.php?id=' . $fx->roles['keeper'], 'AssignUsersToShops.php'] as $page) {
+        $a->get('Public/' . $page);
+        check('a normal user is turned away from ' . strtok($page, '?') . ' on the server', $a->isOn('Public/home.php'), $a);
+    }
+    $a->post('Controller/userController.php', ['chng-pwd' => '1', 'euid' => $fx->users['bob'], 'epassword' => 'owned', 'e-cpassword' => 'owned', 'csrf_token' => $aliceToken]);
+    check('a normal user cannot reset another user\'s password (403)', $a->status === 403 && $fx->passwordIs('bob', $pw), $a);
+    $a->post('Controller/userController.php', ['edit-user' => '1', 'euserid' => $fx->users['alice'], 'username' => 'e2e_alice', 'userEmail' => 'e2e_alice@example.com',
+        'userContact' => '0000000000', 'userRole' => $fx->roles['keeper'], 'status' => 'on', 'eprofile' => 'avator.svg', 'csrf_token' => $aliceToken]);
+    check('nor edit users (403)', $a->status === 403, $a);
+    $a->post('Controller/userrolecontrol.php', ['delete-role' => '1', 'delete_role_id' => $fx->roles['keeper'], 'csrf_token' => $aliceToken]);
+    check('nor switch a role off through the role page (403)', $a->status === 403 && $fx->roleActive('keeper'), $a);
+    $a->post('AJAX/UserRole/data.php', ['id' => $fx->roles['keeper'], 'status' => 0, 'csrf_token' => $aliceToken]);
+    check('nor through the role editor\'s status switch (403)', $a->status === 403 && $fx->roleActive('keeper'), $a);
+
+    echo "Own password\n";
+    $a->get('Public/home.php');
+    $aliceToken = $a->csrf();
+    check('the profile password form asks for the current password', $a->has('name="ue_current_password"') && $aliceToken !== '', $a);
+    $a->post('Controller/userController.php', ['uchng-pwd' => '1', 'ue_current_password' => 'wrong', 'uepassword' => 'Alice-New-1', 'ue_cpassword' => 'Alice-New-1', 'csrf_token' => $aliceToken]);
+    check('a wrong current password changes nothing', $a->has('Your current password is incorrect.') && $fx->passwordIs('alice', $pw), $a);
+    $a->post('Controller/userController.php', ['uchng-pwd' => '1', 'ue_current_password' => $pw, 'uepassword' => 'Alice-New-1', 'ue_cpassword' => 'Alice-New-1']);
+    check('a form without the CSRF token changes nothing', $a->has('Your session expired.') && $fx->passwordIs('alice', $pw), $a);
+    $a->post('Controller/userController.php', ['uchng-pwd' => '1', 'ueuid' => $fx->users['bob'], 'ue_current_password' => $pw, 'uepassword' => 'Alice-New-1', 'ue_cpassword' => 'Alice-New-1', 'csrf_token' => $aliceToken]);
+    check('with the current password she changes her own', $a->has('Password Updated!') && $fx->passwordIs('alice', 'Alice-New-1'), $a);
+    check('never someone else\'s, whatever id the form names', $fx->passwordIs('bob', $pw), $a);
+    $fx->setPassword('alice', $pw);
+
+    echo "Users and roles: the admin\n";
+    $b->get('Public/user-roles.php');
+    $rolesToken = $b->csrf();
+    check('the admin opens User Roles', $b->isOn('Public/user-roles.php') && $rolesToken !== '', $b);
+    checkClean('the user roles page', $b);
+    $b->post('Controller/userrolecontrol.php', ['activate-role' => '1', 'activate_role_id' => $fx->roles['retired']]);
+    check('a role change without the CSRF token is refused', !$fx->roleActive('retired') && $b->has('Your session expired.'), $b);
+    $b->post('Controller/userrolecontrol.php', ['activate-role' => '1', 'activate_role_id' => $fx->roles['retired'], 'csrf_token' => $rolesToken]);
+    check('the admin switches a role on', $fx->roleActive('retired'), $b);
+    $b->post('AJAX/UserRole/data.php', ['id' => $fx->roles['retired'], 'status' => 0, 'csrf_token' => $rolesToken]);
+    check('and off again from the role editor', $b->status === 200 && !$fx->roleActive('retired'), $b);
+    $b->get('Public/edit-role.php?id=' . $fx->roles['keeper']);
+    check('the role editor no longer offers Add Users or Add User Role', $b->isOn('Public/edit-role.php') && $b->has('<td>Price Change<input') && !$b->has('<td>Add Users<input') && !$b->has('<td>Add User Role<input'), $b);
+    checkClean('the role editor', $b);
+
+    echo "Forgot password\n";
+    $anon->get('Public/forget-password.php');
+    check('Forgot Password tells the user to contact the system admin', $anon->has('Please contact your system admin to reset your password.'), $anon);
+    $anon->post('Controller/userController.php', ['btn_password_change' => 'Sign In', 'user_name' => 'e2e_alice']);
+    check('the old reset-by-email request does nothing', $anon->isOn('Public/login.php') && $fx->resetToken('alice') === null, $anon);
 
     //scenarios of later tasks are added above this line
 } finally {

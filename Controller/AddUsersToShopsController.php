@@ -4,7 +4,7 @@
 //Only a signed-in super admin may use it, every request carries the page's CSRF token, and
 //every answer is JSON: {"ok": true|false, "message": "..."}.
 include "../Includes/includes.php";
-require_once "../Includes/csrf.php";
+require_once "../Includes/super_admin.php";
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -22,8 +22,7 @@ function assign_post_id($key)
     return $id === false ? null : $id;
 }//posted id
 
-$signedIn = isset($_SESSION['user_id']) ? (new User())->getOneUser($_SESSION['user_id']) : [];
-if(empty($signedIn) || $signedIn[0]['UserType'] != 1 || $signedIn[0]['UserStat'] != 1)
+if(!is_super_admin_session())
 {
     assign_respond(false, 'Only a system admin can change shop access.', 403);
 }//not a super admin
