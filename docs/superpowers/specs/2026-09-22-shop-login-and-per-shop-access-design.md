@@ -263,7 +263,23 @@ New `Includes/csrf.php`: `csrf_token()` (per-session random token) and
   enforcement → shop login → admin screen → users page → end-to-end verification.
 - Not merged to `main`; not deployed. On deploy: run `db/shop_access_install.php` first (see §4).
 
-## 11. Follow-ups (out of scope)
+## 11. Additions found while planning and building
+
+1. `Includes/newauthcheck.php`, polled every 10 s by every page, applies the same
+   `canAccessShop` check, so revocation also reaches idle screens (POS) within seconds.
+2. **Switch Shop** was shown only to super admins; every user now sees it (moving between
+   their shops, handing a counter over).
+3. `Public/AssignUsersToShops.php` refused non-admins only with a script after sending them
+   the page; it now redirects on the server.
+4. `AJAX/AddUsersToShops/addUsersToSAhops.php` assigned any user to any shop without any
+   authentication and had no callers; it was removed.
+
+## 12. Follow-ups (out of scope)
 
 - Login throttling for both the main login and the shop login.
 - The main login page accepts only the username although its label says *Username/email*.
+- `View/right-sidebar.php` reads `$feature[0]["is_view"]` without `isset`, so a role with no
+  feature rows (e.g. a role never saved in the role editor) prints warnings on every page.
+- Pre-existing undefined-variable notices in some modal templates (SysFeatures, new-company,
+  SalesRep*, add-units) and `Reports/batchwise.php`.
+- The rest of `Controller/shopController.php` (create/update shop) has no authentication check.

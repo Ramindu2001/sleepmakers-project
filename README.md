@@ -40,6 +40,8 @@ The project uses a traditional PHP application structure with separate folders f
 - Session-based authentication
 - Access checks for protected pages
 - Shop-aware data filtering
+- Shop login and per-shop access: each user's role is set per shop, and access to a shop can
+  be revoked and restored (see `db/SHOP_ACCESS_MODULE.md`)
 - User and role validation during login
 
 ## Project Structure
@@ -104,10 +106,18 @@ Review the following areas before deploying:
 Typical usage flow:
 
 1. Log in with an authorized account.
-2. Select the appropriate shop or branch.
+2. Select the shop or branch and sign in to it with your username and password.
 3. Use the POS interface to search items and add them to the cart.
 4. Hold or complete invoices as needed.
 5. Use the inventory and reporting screens to monitor stock and business activity.
+
+## Tests
+
+```
+sh tools/get-phpunit.sh                                      # once: downloads PHPUnit 11
+C:/xampp/php/php.exe tools/phpunit.phar                      # unit + integration (database sleepmakers_test)
+C:/xampp/php/php.exe tests/e2e/shop_login_e2e.php [base-url] # end to end against a running local site
+```
 
 ## Development Notes
 
