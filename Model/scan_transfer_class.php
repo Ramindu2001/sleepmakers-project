@@ -62,6 +62,52 @@ class TransferScan extends ScanDocument
         });
     }//send apply
 
+    public function receivePreview($transfer_id, $shop_id, $user_id, $raw, array $decisions = [])
+    {
+        return $this->buildReceive($this->header($transfer_id, $shop_id, $user_id, 'receive', false), $raw, $decisions);
+    }//receive preview
+
+    //sets each line's received quantity from what the receiving shop scanned. Receiving sets
+    //rather than adds, so the same upload twice changes nothing (no duplicate guard), but every
+    //upload is recorded
+    public function receiveApply($transfer_id, $shop_id, $user_id, $raw, array $decisions)
+    {
+        return $this->transaction(function() use ($transfer_id, $shop_id, $user_id, $raw, $decisions) {
+            $header = $this->header($transfer_id, $shop_id, $user_id, 'receive', true);
+            $preview = $this->buildReceive($header, $raw, $decisions);
+            $this->assertCanApply($preview, $decisions);
+            if($preview['short'] > 0 && empty($decisions['confirm_short']))
+            {
+                throw new ScanRefused(409, self::qty($preview['short']) . ' item(s) short. They stay in the sending shop. Apply the received quantities?',
+                    $preview, 'short');
+            }//shortage not confirmed
+
+            $pdo = $this->connect();
+            foreach($preview['groups'] as $group)
+            {
+                $left = $group['received'];
+                foreach($group['tdids'] as $tdid)
+                {
+                    $stmt = $pdo->prepare("SELECT TransferQty, UnitPurchasePrice FROM transferdetails WHERE TDID = ? FOR UPDATE;");
+                    $stmt->execute([$tdid]);
+                    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                    $take = min((float)$row['TransferQty'], $left);
+                    $left -= $take;
+                    $pdo->prepare("UPDATE transferdetails SET ReceivedQty = ?, TransferTotalAmount = ? WHERE TDID = ?;")
+                        ->execute([$take, round($take * (float)$row['UnitPurchasePrice'], 2), $tdid]);
+                }//each line of the product, in order
+            }//each product on the transfer
+
+            $this->batches->record(ScanBatches::TRANSFER_IN, $header['THID'], $shop_id, $user_id, $preview['applied'], $preview['scans']);
+            $received = array_sum(array_column($preview['groups'], 'received'));
+            return [
+                'message' => 'Received quantities set on ' . $header['TransferNo'] . ': ' . self::qty($received) . ' item(s) received'
+                    . ($preview['short'] > 0 ? ', ' . self::qty($preview['short']) . ' short.' : '.'),
+                'result' => ['doc_id' => (int)$header['THID'], 'lines' => count($preview['groups']), 'qty' => self::number($received)],
+            ];
+        });
+    }//receive apply
+
     //the transfer, when this user may scan it from this side now (locked for update when $lock)
     private function header($transfer_id, $shop_id, $user_id, $side, $lock)
     {
@@ -136,6 +182,77 @@ class TransferScan extends ScanDocument
             'options' => [],
         ], $decisions, ScanBatches::TRANSFER_OUT);
     }//build send
+
+    private function buildReceive(array $header, $raw, array $decisions)
+    {
+        $stmt = $this->connect()->prepare("SELECT transferdetails.TDID, transferdetails.products_PDID, transferdetails.TransferQty,
+            products.Barcode, products.ItemName FROM transferdetails
+            INNER JOIN products ON products.PDID = transferdetails.products_PDID
+            WHERE transferdetails.TransferHeader_THID = ? ORDER BY transferdetails.TDID;");
+        $stmt->execute([$header['THID']]);
+
+        //the transfer's products by barcode: what was sent, and the lines to fill in order. The
+        //receiving shop may not have these products yet - they are created when it is verified
+        $groups = [];
+        foreach($stmt->fetchAll(PDO::FETCH_ASSOC) as $row)
+        {
+            $code = trim((string)$row['Barcode']);
+            $key = $code === '' ? '#' . $row['products_PDID'] : strtoupper($code);
+            if(!isset($groups[$key]))
+            {
+                $groups[$key] = ['barcode' => $code === '' ? null : $code, 'key' => $code === '' ? $key : $code,
+                    'product_id' => (int)$row['products_PDID'], 'name' => $row['ItemName'], 'sent' => 0, 'tdids' => []];
+            }
+            $groups[$key]['sent'] += (float)$row['TransferQty'];
+            $groups[$key]['tdids'][] = (int)$row['TDID'];
+        }
+        $parsed = ScanParser::parse($raw, array_values(array_filter(array_column($groups, 'barcode'), 'is_string')));
+
+        $lines = [];
+        $short = 0;
+        foreach($groups as &$group)
+        {
+            $scanned = ($group['barcode'] !== null && isset($parsed['items'][$group['barcode']])) ? $parsed['items'][$group['barcode']] : 0;
+            $group['received'] = min($group['sent'], $scanned);
+            $short += max(0, $group['sent'] - $scanned);
+            $line = [
+                'key' => $group['key'], 'barcode' => $group['barcode'], 'product_id' => $group['product_id'], 'name' => $group['name'],
+                'qty' => $scanned, 'sent' => self::number($group['sent']), 'received' => self::number($group['received']),
+                'apply_qty' => self::number($group['received']), 'status' => 'ok', 'message' => 'Match',
+                'left_out' => false, 'can_leave_out' => false, 'editable' => false,
+            ];
+            if($scanned < $group['sent'])
+            {
+                $line['status'] = 'warn';
+                $line['message'] = 'Short ' . self::qty($group['sent'] - $scanned);
+            }
+            elseif($scanned > $group['sent'])
+            {
+                $line['status'] = 'warn';
+                $line['message'] = 'Extra ' . self::qty($scanned - $group['sent']) . ' - only ' . self::qty($group['sent']) . ' can be received';
+            }
+            $lines[] = $line;
+        }
+        unset($group);
+        foreach($parsed['unknown'] as $token => $qty)
+        {
+            $lines[] = $this->errorLine($token, $qty, 'Not on this transfer');
+        }
+
+        $preview = $this->finish([
+            'context' => 'transfer_receive',
+            'doc_id' => (int)$header['THID'],
+            'scans' => $parsed['scans'],
+            'truncated' => $parsed['truncated'],
+            'lines' => $lines,
+            'options' => [],
+        ], $decisions, null);
+        $preview['short'] = self::number($short);
+        $preview['groups'] = array_values(array_map(function($group) {
+            return ['received' => $group['received'], 'tdids' => $group['tdids']];
+        }, $groups));
+        return $preview;
+    }//build receive
 
     //the product's batches with stock, oldest first, less what this transfer already takes
     private function sendLine(array $product, $barcode, $qty, $shop_id, array $taken)

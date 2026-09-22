@@ -80,6 +80,12 @@ try
         $check = function() use ($model, $doc_id, $shop_id, $user_id, $raw, $decisions) { return $model->sendPreview($doc_id, $shop_id, $user_id, $raw, $decisions); };
         $apply = function() use ($model, $doc_id, $shop_id, $user_id, $raw, $decisions) { return $model->sendApply($doc_id, $shop_id, $user_id, $raw, $decisions); };
     }
+    elseif($context === 'transfer_receive')
+    {
+        $model = new TransferScan();
+        $check = function() use ($model, $doc_id, $shop_id, $user_id, $raw, $decisions) { return $model->receivePreview($doc_id, $shop_id, $user_id, $raw, $decisions); };
+        $apply = function() use ($model, $doc_id, $shop_id, $user_id, $raw, $decisions) { return $model->receiveApply($doc_id, $shop_id, $user_id, $raw, $decisions); };
+    }
     else
     {
         scan_respond(400, ['ok' => false, 'message' => 'Unknown upload.']);

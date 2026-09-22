@@ -93,6 +93,30 @@ try {
     scan($a, 'transfer_send', $stock->transfer, 'apply', str_repeat("E2EBED01\n", 4), [], $token);
     check('more than the stock left is refused (422)', $a->status === 422 && count($stock->transferLines()) === 3, $a);
 
+    echo "Transfer - receiving\n";
+    $bob = new E2EBrowser($base);
+    signIn($bob, 'e2e_bob', $pw);
+    shopLogin($bob, $S, 'e2e_bob', $pw);
+    $bob->get('Public/transfer-details.php?id=' . $stock->transfer);
+    $bobToken = $bob->csrf();
+    check('the receiving shop\'s transfer page offers Scan received items', $bob->has('Scan received items')
+        && $bob->has('data-context="transfer_receive"'), $bob);
+    checkClean('the receiving transfer page', $bob);
+    $raw = str_repeat("E2EBED01\n", 6) . str_repeat("E2ESHT01\n", 3);
+    scan($bob, 'transfer_receive', $stock->transfer, 'check', $raw, [], $bobToken);
+    $bed = $bob->status === 200 ? $bob->json('preview')['lines'][0] : null;
+    check('check compares what arrived with what was sent', $bed !== null && [$bed['sent'], $bed['qty'], $bed['message']] === [7, 6, 'Short 1']
+        && !isset($bob->json('preview')['groups']), $bob);
+    scan($bob, 'transfer_receive', $stock->transfer, 'apply', $raw, [], $bobToken);
+    check('a shortage asks for a confirmation (409)', $bob->status === 409 && $bob->json('confirm') === 'short', $bob);
+    scan($bob, 'transfer_receive', $stock->transfer, 'apply', $raw, ['confirm_short' => 1], $bobToken);
+    check('confirmed, the received quantities are set in line order', $bob->status === 200
+        && array_column($stock->transferLines(), 'ReceivedQty') === ['5.000', '1.000', '3.000'], $bob);
+    scan($a, 'transfer_receive', $stock->transfer, 'check', $raw, [], $token);
+    check('the sending shop cannot receive (404)', $a->status === 404, $a);
+    scan($bob, 'transfer_send', $stock->transfer, 'check', $raw, [], $bobToken);
+    check('the receiving shop cannot send (404)', $bob->status === 404, $bob);
+
     //scenarios of later tasks are added above this line
 } finally {
     $stock->down();

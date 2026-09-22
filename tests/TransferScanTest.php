@@ -132,6 +132,91 @@ final class TransferScanTest extends DatabaseTestCase
         $this->assertSame('4.000', $this->details()[0]['TransferQty']);
     }
 
+    // ---- receiving -------------------------------------------------------------------------
+
+    //the transfer as the sending side left it: bed 5 from B1, bed 2 from B2, sheet 3
+    private function sent()
+    {
+        foreach ([[$this->bed1, $this->bed, 5, 900, 'B1'], [$this->bed2, $this->bed, 2, 950, 'B2'], [$this->sheet1, $this->sheet, 3, 200, 'S1']] as [$inv, $product, $qty, $price, $batch]) {
+            $this->insert('transferdetails', ['TransferQty' => $qty, 'ReceivedQty' => $qty, 'UnitPurchasePrice' => $price, 'UnitSellingPrice' => $price,
+                'TransferTotalAmount' => $qty * $price, 'InventoryID' => $inv, 'products_PDID' => $product, 'VariationID' => 0, 'RackID' => 1,
+                'TransferStat' => 0, 'TransferHeader_THID' => $this->transfer, 'Batch_ID' => $batch]);
+        }
+    }
+
+    private function received()
+    {
+        return $this->pdo->query('SELECT ReceivedQty, TransferTotalAmount FROM transferdetails ORDER BY TDID')->fetchAll(PDO::FETCH_NUM);
+    }
+
+    public function test_receive_compares_the_scans_with_what_was_sent()
+    {
+        $this->sent();
+        $p = $this->scan->receivePreview($this->transfer, $this->showroom, $this->bob, $this->codes('COO00001', 6) . $this->codes('LIN00001', 3) . "NOPE\n");
+        $lines = $this->lines($p);
+
+        $this->assertSame([7, 6, 6, 'warn', 'Short 1'], [$lines['COO00001']['sent'], $lines['COO00001']['qty'], $lines['COO00001']['received'],
+            $lines['COO00001']['status'], $lines['COO00001']['message']]);
+        $this->assertSame(['ok', 'Match', false], [$lines['LIN00001']['status'], $lines['LIN00001']['message'], $lines['LIN00001']['can_leave_out']]);
+        $this->assertSame('Not on this transfer', $lines['NOPE']['message']);
+        $this->assertSame(1, $p['blocking']);
+        $this->assertSame(1, $p['short']);
+    }
+
+    public function test_receive_fills_the_lines_in_order_after_confirming_the_shortage()
+    {
+        $this->sent();
+        $raw = $this->codes('COO00001', 6) . $this->codes('LIN00001', 3);
+        try {
+            $this->scan->receiveApply($this->transfer, $this->showroom, $this->bob, $raw, []);
+            $this->fail('expected a refusal');
+        } catch (ScanRefused $e) {
+            $this->assertSame([409, 'short'], [$e->status, $e->confirm]);
+            $this->assertSame('1 item(s) short. They stay in the sending shop. Apply the received quantities?', $e->getMessage());
+        }
+        $this->assertSame([['5.000', '4500.00'], ['2.000', '1900.00'], ['3.000', '600.00']], $this->received());
+
+        $result = $this->scan->receiveApply($this->transfer, $this->showroom, $this->bob, $raw, ['confirm_short' => 1]);
+        $this->assertSame([['5.000', '4500.00'], ['1.000', '950.00'], ['3.000', '600.00']], $this->received());
+        $this->assertSame('Received quantities set on TR_TEST: 9 item(s) received, 1 short.', $result['message']);
+    }
+
+    public function test_extra_scans_are_capped_and_unscanned_products_are_received_as_none()
+    {
+        $this->sent();
+        $line = $this->lines($this->scan->receivePreview($this->transfer, $this->showroom, $this->bob, $this->codes('COO00001', 9)))['COO00001'];
+        $this->assertSame([7, 'warn', 'Extra 2 - only 7 can be received'], [$line['received'], $line['status'], $line['message']]);
+
+        $this->scan->receiveApply($this->transfer, $this->showroom, $this->bob, $this->codes('LIN00001', 3), ['confirm_short' => 1]);
+        $this->assertSame([['0.000', '0.00'], ['0.000', '0.00'], ['3.000', '600.00']], $this->received());
+    }
+
+    public function test_receiving_the_same_batch_again_just_sets_the_same_quantities()
+    {
+        $this->sent();
+        $raw = $this->codes('COO00001', 7) . $this->codes('LIN00001', 3);
+        $this->scan->receiveApply($this->transfer, $this->showroom, $this->bob, $raw, []);
+        $this->scan->receiveApply($this->transfer, $this->showroom, $this->bob, $raw, []);
+        $this->assertSame([['5.000', '4500.00'], ['2.000', '1900.00'], ['3.000', '600.00']], $this->received());
+        $this->assertSame(2, (int)$this->pdo->query("SELECT COUNT(*) FROM scanbatches WHERE DocType = 'TRF_IN'")->fetchColumn());
+    }
+
+    public function test_receive_is_refused_to_the_sending_shop_and_allowed_with_verify_rights()
+    {
+        $this->sent();
+        try {
+            $this->scan->receivePreview($this->transfer, $this->warehouse, $this->alice, 'COO00001');
+            $this->fail('expected 404');
+        } catch (ScanRefused $e) {
+            $this->assertSame(404, $e->status);
+        }
+        $checker = $this->createRole('Checker');
+        $this->grant($checker, 4, ['is_verify']);
+        $dave = $this->createUser('dave', 'x', $checker);
+        $this->assign($dave, $this->showroom, $checker);
+        $this->assertSame(7, $this->lines($this->scan->receivePreview($this->transfer, $this->showroom, $dave, 'COO00001'))['COO00001']['sent']);
+    }
+
     public function test_send_is_refused_to_the_receiving_shop_closed_transfers_and_users_without_rights()
     {
         $viewer = $this->createRole('Viewer');

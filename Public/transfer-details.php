@@ -49,8 +49,9 @@ $transfer_header_stat = (string)$headerCheck[0]['TransferStat'];
     $feature_id=4;
     include '../Includes/editPermission.php';
 
-    //scanner upload (docs/superpowers/specs/2026-09-22-scanner-upload-design.md): the sending shop
-    //scans what it sends, while the transfer is on hold or pending
+    //scanner upload (docs/superpowers/specs/2026-09-22-scanner-upload-design.md), while the
+    //transfer is on hold or pending: the sending shop scans what it sends, the receiving shop
+    //scans what arrived
     require_once '../Includes/scan_upload.php';
     $scanAccess = new ShopAccess();
     $scan_upload = null;
@@ -60,6 +61,12 @@ $transfer_header_stat = (string)$headerCheck[0]['TransferStat'];
         $scan_upload = ['context' => 'transfer_send', 'doc_id' => $transfer_header_id, 'title' => $headerCheck[0]['TransferNo'],
             'apply_label' => 'Add to Transfer', 'button' => 'Scan / Upload'];
     }//sending shop
+    elseif($transfer_header_stat <= 1 && $headerCheck[0]['TransferTo'] == $shop_id
+        && $scanAccess->hasFeatureRight($_SESSION['user_id'], $shop_id, TransferScan::FEATURE, TransferScan::RECEIVE_RIGHTS))
+    {
+        $scan_upload = ['context' => 'transfer_receive', 'doc_id' => $transfer_header_id, 'title' => $headerCheck[0]['TransferNo'],
+            'apply_label' => 'Apply received quantities', 'button' => 'Scan received items'];
+    }//receiving shop
     ?>
     <!--  Sidebar End -->
     <!--  Main wrapper -->

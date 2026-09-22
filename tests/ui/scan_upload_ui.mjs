@@ -160,6 +160,32 @@ try {
       === 'E2EBED01/e2e Bed/3/10/E2EB1 × 3');
   check('and Add to Transfer is enabled', await applyEnabled());
   await shot('scan-4-transfer.png');
+  await js(`document.getElementById('scan_apply').click()`);
+  await sleep(2500);
+  check('Add to Transfer confirms what it added', dialogs.includes('Added 1 product(s), 3 item(s) to E2E-T1.'));
+  check('and the transfer table shows the line', await js(`document.getElementById('tbl_transfer_detail').textContent.includes('e2e Bed')`));
+
+  console.log('Transfer - receiving');
+  await go(`${BASE}/Public/logout.php`);
+  await go(`${BASE}/Public/login.php`);
+  await submit(`document.getElementById('user_name').value='e2e_bob';document.getElementById('user_pwd').value=${JSON.stringify(fx.password)};document.querySelector('input[name=btn_log_in]').click()`);
+  await js(`document.querySelector('.synnex-shop[data-shop-id="${fx.shops.S}"]').click()`);
+  await sleep(800);
+  await submit(`document.getElementById('shop_user_pwd').value=${JSON.stringify(fx.password)};document.querySelector('input[name=btn_shop_login]').click()`);
+  await go(`${BASE}/Public/transfer-details.php?id=${fx.transfer}`);
+  check('the receiving shop sees Scan received items', (await js(`document.querySelector('.btn-scan-upload')?.textContent.trim()`)) === 'Scan received items');
+  await js('document.activeElement && document.activeElement.blur()');
+  await scanner(['E2EBED01', 'E2EBED01'], 'Enter');
+  await sleep(1500);
+  check('the preview compares sent, scanned and received',
+    (await js(`[...document.querySelectorAll('#scan_preview tbody tr')].map(tr => [...tr.cells].slice(2, 6).map(td => td.textContent.trim()).join('/')).join('|')`))
+      === '3/2/2/Check Short 1');
+  await shot('scan-5-receive.png');
+  const before = dialogs.length;
+  await js(`document.getElementById('scan_apply').click()`);
+  await sleep(3000);
+  check('a shortage is confirmed first, then applied', dialogs[before] === '1 item(s) short. They stay in the sending shop. Apply the received quantities?'
+    && dialogs[before + 1] === 'Received quantities set on E2E-T1: 2 item(s) received, 1 short.');
 
   // scenarios of later tasks are added above this line
   // errors from the scripts this feature uses or changed; others are listed but were there before
