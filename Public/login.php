@@ -103,6 +103,12 @@
                     <p class="text-center" style="color:#ff0000; font-weight:bold;">No shops assigned to your account. Please contact your administrator.</p>
                     <?php
                   }
+                  elseif ($_SESSION['user_error']==10)
+                  {
+                    ?>
+                    <p class="text-center" style="color:#ff0000; font-weight:bold;">Company Inactive. Please Contact Synnex IT Solutions.</p>
+                    <?php
+                  }
                   else
                   {
                     ?>

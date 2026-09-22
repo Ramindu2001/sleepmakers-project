@@ -63,6 +63,15 @@ class E2EBrowser
         return $this;
     }
 
+    //the PHP session ends (browser closed, session expired) - the remember-me cookies stay
+    public function dropSession()
+    {
+        $lines = file($this->jar);
+        file_put_contents($this->jar, implode('', array_filter($lines, function ($line) {
+            return strpos($line, "\tPHPSESSID\t") === false;
+        })));
+    }
+
     public function isOn($page) { return strpos(parse_url($this->url, PHP_URL_PATH), '/' . $page) !== false; }
     public function has($text) { return strpos($this->body, $text) !== false; }
 
@@ -291,6 +300,36 @@ try {
     shopLogin($b, $W, 'e2e_alice', $pw);
     //the menu label, not the URL: the session poll's JavaScript names switchshop.php on every page
     check('Switch Shop is offered to a normal user', $b->has('>Switch Shop</p>'), $b);
+
+    echo "Main login\n";
+    signIn($b, 'e2e_bob', $pw);
+    check('bob, with one shop, goes straight into it', $b->isOn('Public/home.php'), $b);
+    signIn($b, 'e2e_carol', $pw);
+    check('carol, whose only role is inactive, is told so', $b->isOn('Public/login.php') && $b->has('Inactive userrole'), $b);
+    $fx->setActive('bob', 'S', 0);
+    signIn($b, 'e2e_bob', $pw);
+    check('bob, whose only shop was revoked, has no shops', $b->isOn('Public/login.php') && $b->has('No shops assigned'), $b);
+    $fx->setActive('bob', 'S', 1);
+
+    echo "Remember me\n";
+    $b->get('Public/logout.php');
+    $b->post('Controller/userController.php', ['user_name' => 'e2e_bob', 'user_pwd' => $pw, 'btn_log_in' => 'Sign In', 'remember_me' => 'on']);
+    $b->dropSession();
+    $b->get('Public/login.php');
+    check('a remembered single-shop user comes straight back into his shop', $b->isOn('Public/home.php'), $b);
+
+    $b->get('Public/logout.php');
+    $b->post('Controller/userController.php', ['user_name' => 'e2e_alice', 'user_pwd' => $pw, 'btn_log_in' => 'Sign In', 'remember_me' => 'on']);
+    shopLogin($b, $W, 'e2e_alice', $pw);
+    $b->dropSession();
+    $b->get('Public/login.php');
+    check('a remembered user comes back into the shop she signed into', $b->isOn('Public/home.php') && sees($b, 'store.php'), $b);
+    $fx->setActive('alice', 'W', 0);
+    $b->dropSession();
+    $b->get('Public/login.php');
+    check('but not once her access to it was revoked', $b->isOn('Public/dashboard.php'), $b);
+    $fx->setActive('alice', 'W', 1);
+    $b->get('Public/logout.php');
 
     //scenarios of later tasks are added above this line
 } finally {

@@ -423,133 +423,76 @@ elseif(isset($_POST['btn_log_in']))
     {
         $_SESSION['user_error']=2;
         header("Location: ../Public/login.php");
-    }//elseif user not exist
+    }//user not exist
+    elseif($data[0]['UserStat']!=1)
+    {
+        $_SESSION['user_error'] = 8;
+        header("Location: ../Public/login.php");
+    }//user inactive
+    elseif(!password_verify($userpwd, $data[0]['UserPwd']))
+    {
+        $_SESSION['user_error'] = 3;
+        header("Location: ../Public/login.php");
+    }//wrong password
     else
-    {   if($data[0]['UserStat']==1)
+    {
+        $logObj = new User();
+        //update user log
+        $logObj->editUserLogStat($data[0]['USID']);
+
+        //the shops this user may enter, each through the role held there (Model/shop_access_class.php)
+        $shopAccess = new ShopAccess();
+        $shops = $shopAccess->getSelectableShops($data[0]['USID']);
+        if(empty($shops))
         {
-            if(password_verify($userpwd, $data[0]['UserPwd']))
+            //7: assigned, but the role they hold is inactive - 9: nothing to enter
+            $_SESSION['user_error'] = $shopAccess->hasInactiveRoleAssignment($data[0]['USID']) ? 7 : 9;
+            header("Location: ../Public/login.php");
+        }//no shop to enter
+        elseif(count($shops)==1 && ($reason = ShopAccess::unavailableReason($shops[0], $data[0]['UserType'])) !== null)
+        {
+            if($reason == ShopAccess::ERR_COMPANY_EXPIRED)
             {
-                $logObj = new User();
-                //update user log
-                $logObj->editUserLogStat($data[0]['USID']);
-
-                date_default_timezone_set("Asia/Colombo");
-                $login_date_time = date("Y-m-d h:i:s");
-
-
-                $uRStatus=$logObj->CheckUserRoleStatus($data[0]['UserRoles_URID']);
-                if($data[0]['UserType']==0)
-                {
-                    if(count($uRStatus)==0)
-                    {
-                        $_SESSION['user_error'] = 7;
-                        header("Location: ../Public/login.php");
-                    }
-                    else
-                    {
-                        $_SESSION['user_id'] = $data[0]['USID'];
-                        $_SESSION['user'] = $data;
-                        $logObj->setUserLog($login_date_time, $login_date_time, 1, $data[0]['USID']);
-                        $comData = $comObj->getCompanyByUser($data[0]['USID'],$data[0]['UserType']);
-                        if(empty($comData))
-                        {
-                            // No shops assigned to this user
-                            $_SESSION['user_error'] = 9;
-                            unset($_SESSION['user_id']);
-                            unset($_SESSION['user']);
-                            header("Location: ../Public/login.php");
-                        }
-                        elseif(count($comData)==1)
-                        {
-                            $date=date("Y-m-d");
-                            if($date>$comData[0]["ComExpireDate"])
-                            {
-                                $_SESSION["expired"]=1;
-                                unset($_SESSION['user_id']);
-                                header("Location: ../Public/login.php");                            
-                            }
-                            else
-                            {
-                                $_SESSION['shop_id'] = $comData[0]['SHID'];
-                                if(isset($_POST["remember_me"]))
-                                {
-                                    $_SESSION["remember_me"]=1;
-                                    $user_id=$data[0]["USID"];
-                                    setcookie('remember_meS', '1', time() + (30 * 24 * 60 * 60), "/"); 
-                                    (new RememberMe())->rememberUser($user_id); //signed token, see Includes/remember_me.php
-                                }
-                                header("Location: ../Public/home.php");
-                            }
-                        }
-                        else
-                        {
-                            $_SESSION["toast"]=1;
-                            if(isset($_POST["remember_me"]))
-                            {
-                                $_SESSION["remember_me"]=1;
-                                $user_id=$data[0]["USID"];
-                                setcookie('remember_meS', '1', time() + (30 * 24 * 60 * 60), "/"); 
-                                (new RememberMe())->rememberUser($user_id); //signed token, see Includes/remember_me.php
-                            }
-                            header("Location: ../Public/dashboard.php");
-                        }
-                        
-                    }
-                }
-                else
-                {
-                    $_SESSION['user_id'] = $data[0]['USID'];
-                    $_SESSION['user'] = $data;
-                    $logObj->setUserLog($login_date_time, $login_date_time, 1, $data[0]['USID']);
-
-                    $comData = $comObj->getCompanyByUser($data[0]['USID'],$data[0]['UserType']);
-
-                    if(empty($comData))
-                    {
-                        // No shops assigned to this user
-                        $_SESSION['user_error'] = 9;
-                        unset($_SESSION['user_id']);
-                        unset($_SESSION['user']);
-                        header("Location: ../Public/login.php");
-                    }
-                    elseif(count($comData)==1)
-                    {
-                        $_SESSION['shop_id'] = $comData[0]['SHID'];
-                        if(isset($_POST["remember_me"]))
-                        {
-                            $_SESSION["remember_me"]=1;
-                            $user_id=$data[0]["USID"];
-                            setcookie('remember_meS', '1', time() + (30 * 24 * 60 * 60), "/"); 
-                            (new RememberMe())->rememberUser($user_id); //signed token, see Includes/remember_me.php
-                        }
-                        header("Location: ../Public/home.php");
-                    }
-                    else
-                    {
-                        $_SESSION["toast"]=1;
-                        if(isset($_POST["remember_me"]))
-                        {
-                            $_SESSION["remember_me"]=1;
-                            $user_id=$data[0]["USID"];
-                            setcookie('remember_meS', '1', time() + (30 * 24 * 60 * 60), "/"); 
-                            (new RememberMe())->rememberUser($user_id); //signed token, see Includes/remember_me.php
-                        }
-                        header("Location: ../Public/dashboard.php");
-                    }
-                }
-            }//password match
+                $_SESSION["expired"]=1;
+            }
             else
             {
-                $_SESSION['user_error'] = 3;
-                header("Location: ../Public/login.php");
-            }//wrong password
-        }//user active
+                $_SESSION['user_error'] = 10;
+            }
+            header("Location: ../Public/login.php");
+        }//the only shop's company is closed
         else
         {
-            $_SESSION['user_error'] = 8;
-            header("Location: ../Public/login.php");
-        }//user inactive
-    }//elseif user exist
+            session_regenerate_id(true); //a fresh session id for the signed in user
+            $_SESSION['user_id'] = $data[0]['USID'];
+            $_SESSION['user'] = $data;
+            $login_date_time = date("Y-m-d H:i:s");
+            $logObj->setUserLog($login_date_time, $login_date_time, 1, $data[0]['USID']);
+
+            if(isset($_POST["remember_me"]))
+            {
+                $_SESSION["remember_me"]=1;
+                setcookie('remember_meS', '1', time() + (30 * 24 * 60 * 60), "/"); 
+                (new RememberMe())->rememberUser($data[0]['USID']); //signed token, see Includes/remember_me.php
+            }//remember me
+
+            if(count($shops)==1)
+            {
+                //one shop: the password just checked opens it - the shop screen would only ask again
+                $_SESSION['shop_id'] = $shops[0]['SHID'];
+                if(isset($_POST["remember_me"]))
+                {
+                    (new RememberMe())->rememberShop($data[0]['USID'], $shops[0]['SHID']);
+                }//remembered with its shop
+                header("Location: ../Public/home.php");
+            }//single shop
+            else
+            {
+                $_SESSION["toast"]=1;
+                header("Location: ../Public/dashboard.php");
+            }//choose a shop
+        }//signed in
+    }//user exists, active, right password
 }//log into system
 elseif ($_POST['btn_password_change']) 
 {
