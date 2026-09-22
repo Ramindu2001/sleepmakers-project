@@ -221,14 +221,16 @@ class User extends Dbh
         return $access;
     }
 
-    public function getUserFeatureAccess($user_id,$feature_id)
+    //the user's rights on a feature in a shop - through the role they hold in that shop
+    public function getUserFeatureAccess($user_id,$feature_id,$shop_id)
     {
         $sql = "SELECT RAID, is_create, is_edit, is_view, is_delete, is_verify, is_print, UserRolls_URID, SysFeatures_SFID FROM userroleaccess
         INNER JOIN userroles ON userroles.URID = userroleaccess.UserRolls_URID
-        INNER JOIN user ON user.UserRoles_URID = userroleaccess.UserRolls_URID
-        WHERE USID = ? AND SysFeatures_SFID = ?;";
+        INNER JOIN shopusers ON shopusers.UserRoles_URID = userroleaccess.UserRolls_URID
+        WHERE shopusers.user_USID = ? AND shopusers.shop_SHID = ? AND shopusers.is_active = 1
+        AND userroles.ur_status = 1 AND SysFeatures_SFID = ?;";
         $stmt = $this->connect()->prepare($sql);
-        $stmt->execute([$user_id,$feature_id]);
+        $stmt->execute([$user_id,$shop_id,$feature_id]);
         $data = $stmt->fetchAll(); 
         
         return $data;

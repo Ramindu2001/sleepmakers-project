@@ -1,25 +1,55 @@
 <?php
 include "../Includes/includes.php";
 require_once "../Includes/remember_me.php";
+require_once "../Includes/csrf.php";
+require_once "../Includes/shop_session.php";
 $shopObj = new Shop();
 
 
-if (isset($_POST['btn_continue']))
+if (isset($_POST['btn_shop_login']))
 {
-    $shop_id = $_POST['cmb_shops'];
-    if((isset($_SESSION["remember_me"]) || isset($_COOKIE["remember_meS"])) && isset($_SESSION['user_id']))
+    //entering a shop always takes a username and password - see db/SHOP_ACCESS_MODULE.md.
+    //Whoever signs in here with access to the shop becomes the session's user.
+    $shop_id = filter_var(isset($_POST['shop_id']) ? $_POST['shop_id'] : null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    $username = isset($_POST['user_name']) && is_string($_POST['user_name']) ? $_POST['user_name'] : '';
+
+    if(!isset($_SESSION['user_id']))
     {
-        //signed token, only for a shop this user may open - see Includes/remember_me.php
-        (new RememberMe())->rememberShop($_SESSION['user_id'], $shop_id);
-    }
+        header("Location: ../Public/login.php");
+        exit;
+    }//signed out meanwhile
 
-    //initialize session
-    $_SESSION["loading"]=1;
-    $_SESSION['shop_id'] = $shop_id;
+    if(!csrf_validate(isset($_POST['csrf_token']) ? $_POST['csrf_token'] : null) || $shop_id === false)
+    {
+        $_SESSION['shop_login_error'] = ['shop_id' => (int)$shop_id, 'username' => $username, 'message' => 'Your session expired. Please try again.'];
+        header("Location: ../Public/dashboard.php");
+        exit;
+    }//stale or forged form
 
-    //goto main page
+    $shopAccess = new ShopAccess();
+    $result = $shopAccess->authenticate($username, isset($_POST['user_pwd']) ? $_POST['user_pwd'] : '', $shop_id);
+    if(!$result['ok'])
+    {
+        $_SESSION['shop_login_error'] = ['shop_id' => $shop_id, 'username' => $username, 'message' => ShopAccess::errorMessage($result['error'])];
+        header("Location: ../Public/dashboard.php");
+        exit;
+    }//refused: back to the shop screen, which reopens this shop's dialog
+
+    session_regenerate_id(true); //new privileges, new session id
+    $switched = shop_session_enter($_SESSION, $result['user'], $shop_id);
+    if($switched)
+    {
+        //a shared counter never stays remembered as the previous person
+        RememberMe::forget();
+        setcookie("remember_meS", "", time() - 3600, "/");
+        $login_date_time = date("Y-m-d H:i:s");
+        (new User())->setUserLog($login_date_time, $login_date_time, 1, $result['user']['USID']);
+    }//another user took over
+    //the shop itself is never remembered: every shop entry takes the password
+
     header("Location: ../Public/home.php");
-}//goto shop
+    exit;
+}//log into a shop
 
 if (isset($_POST['btn_save_shop']))
 {

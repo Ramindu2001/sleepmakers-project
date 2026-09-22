@@ -1,6 +1,8 @@
 <?php 
 include '../Includes/includes.php';
 include '../Includes/authcheck.php';
+require_once '../Includes/super_admin.php';
+super_admin_page(); //system admin only, decided before any of the page is sent
 ?>
 <!doctype html>
 <html lang="en">
@@ -109,6 +111,7 @@ include '../Includes/authcheck.php';
                                     <div class="row">
                                         <div class="col-md-12">
                                             <form action="../Controller/userrolecontrol.php" method="POST" class="">
+                                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
                                                 <div class="form-check form-switch mb-3">
                                                     <input class="form-check-input" type="checkbox"
                                                         id="status" <?php 

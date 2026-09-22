@@ -26,7 +26,8 @@ $delete = "is_delete";
 $verify = "is_verify";
 $print = "is_print";
 if ($userType != 1) {
-  $userRole_id = $user[0]['UserRoles_URID'];
+  //the role this user holds in the current shop (Model/shop_access_class.php); 0 matches no rights
+  $userRole_id = (int) (new ShopAccess())->getShopRoleId($user_id, $shop_id);
   $modules = $userObj->getUserRoleModuleAccess($userRole_id);
   $userModules = [];
   foreach ($modules as $row) {
@@ -153,6 +154,7 @@ if ($userType != 1) {
                   <span class="hide-menu">Sales Return</span>
                 </a>
               </li>
+              <?php include __DIR__ . '/menu-customer-orders.php'; ?>
             </ul>
           </li>
           <li class="sidebar-item">
@@ -1321,6 +1323,7 @@ if ($userType != 1) {
             <?php
             }
             ?>
+            <?php include __DIR__ . '/menu-customer-orders.php'; ?>
           </ul>
         </li>
       <?php
@@ -2608,54 +2611,7 @@ if ($userType != 1) {
             }
             ?>
             <?php
-            $feature_id = 20;
-            $feature2 = $userObj->getUserRoleFeatureAccess($userRole_id, $feature_id);
-            $feature_id = 54;
-            $feature3 = $userObj->getUserRoleFeatureAccess($userRole_id, $feature_id);
-            if ($feature3[0]["is_view"] == 1 || $feature2[0]["is_view"] == 1) {
-            ?>
-              <li class="sidebar-item">
-                <a href="javascript:void(0)" class="sidebar-link has-arrow sidebar-link4">
-                  <div class="round-16 d-flex align-items-center justify-content-center">
-                    <i class="ti ti-circle"></i>
-                  </div>
-                  <span class="hide-menu">User</span>
-                </a>
-                <ul aria-expanded="false" class="collapse first-level">
-                  <?php
-                  if ($feature2[0]["is_view"] == 1) {
-                  ?>
-                    <li class="sidebar-item">
-                      <a href="../Public/users.php" class="sidebar-link sidebar-link3">
-                        <div class="round-16 d-flex align-items-center justify-content-center">
-                          <i class="ti ti-star"></i>
-                        </div>
-                        <span class="hide-menu">Add Users</span>
-                      </a>
-                    </li>
-                  <?php
-                  }
-                  ?>
-                  <?php
-                  if ($feature3[0]["is_view"] == 1) {
-                  ?>
-                    <li class="sidebar-item">
-                      <a href="../Public/user-roles.php" class="sidebar-link sidebar-link3">
-                        <div class="round-16 d-flex align-items-center justify-content-center">
-                          <i class="ti ti-star"></i>
-                        </div>
-                        <span class="hide-menu">User Role</span>
-                      </a>
-                    </li>
-                  <?php
-                  }
-                  ?>
-                </ul>
-              </li>
-            <?php
-            }
-            ?>
-            <?php
+            //Users and User Roles are managed by the system (super) admin only - db/SHOP_ACCESS_MODULE.md
             $feature_id = 21;
             $feature = $userObj->getUserRoleFeatureAccess($userRole_id, $feature_id);
             if (isset($feature[0]["is_view"]) && $feature[0]["is_view"] == 1) {

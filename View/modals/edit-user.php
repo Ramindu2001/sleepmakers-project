@@ -11,6 +11,7 @@
             </div>
             <div class="modal-body">
                 <form action="../Controller/userController.php" method="POST" id="form-user" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
                     <div class="form-check form-switch mb-3">
                         <input class="form-check-input" type="checkbox" id="status" name="status" value="1">
                         <label class="form-check-label" for="status">Status</label>
@@ -41,7 +42,7 @@
                                 <input type="tel" name="userContact" id="euserContact" class="form-control" placeholder="Eg: +94-777-123-456" required>
                             </div>
                             <div class="m-2">
-                                <label for="userRole" class="form-label">Select User Role <span class="text-danger">*</span></label>
+                                <label for="userRole" class="form-label">Default Role <span class="text-danger">*</span></label>
                                 <select name="userRole" id="euserRole" class="form-select" required >
                                     <option value=""  disabled>Select User Role</option>
                                     <?php 
@@ -53,6 +54,7 @@
                           }
                           ?>
                                 </select>
+                                <small class="text-muted">Rights in each shop are set under Settings &rarr; Assign Users to Shops.</small>
                             </div>                            
                             <div class="m-2">
                                 <label for="epaylimit" class="form-label">Daily Bill Limit</label>

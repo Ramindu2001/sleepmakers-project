@@ -1,6 +1,8 @@
 <?php 
 include '../Includes/includes.php';
 include '../Includes/authcheck.php';
+require_once '../Includes/super_admin.php';
+super_admin_page(); //system admin only, decided before any of the page is sent
 ?>
 <!doctype html>
 <html lang="en">
@@ -104,6 +106,15 @@ include '../Includes/authcheck.php';
                       </div>
                       <?php
                     }
+                    else if ($_SESSION['user_error']==11)
+                    {
+                      ?>
+                      <div class="alert alert-danger alert-dismissible bg-danger text-white border-0 fade show" role="alert">
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                        <strong>Your session expired.</strong> Please try again.
+                      </div>
+                      <?php
+                    }
                     else
                     {
                       ?>
@@ -145,7 +156,7 @@ include '../Includes/authcheck.php';
                                             <th>User Email</th>
                                             <th>User Contact</th>
                                             <th>Daily Bill Limit</th>
-                                            <th>User Role</th>
+                                            <th>Default Role</th>
 
                                             <th>Status</th>
                                             <th>Action</th>
@@ -228,11 +239,13 @@ include '../Includes/authcheck.php';
                                                 <div class="col-md-3">
                                                     <?php if ($key['UserStat'] == 1) { ?>
                                                         <form action="../Controller/userController.php" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to deactivate this user?');">
+                                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
                                                             <input type="hidden" name="delete_user_id" value="<?=$key['USID']?>">
                                                             <button type="submit" name="delete-user" class="btn btn-sm p-0 border-0 bg-transparent text-warning" title="Deactivate User"><i class="ti ti-user-off"></i></button>
                                                         </form>
                                                     <?php } else { ?>
                                                         <form action="../Controller/userController.php" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to activate this user?');">
+                                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
                                                             <input type="hidden" name="activate_user_id" value="<?=$key['USID']?>">
                                                             <button type="submit" name="activate-user" class="btn btn-sm p-0 border-0 bg-transparent text-success" title="Activate User"><i class="ti ti-user-check"></i></button>
                                                         </form>

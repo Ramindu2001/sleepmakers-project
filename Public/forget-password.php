@@ -23,56 +23,14 @@
                 <a href="index.php" class="text-nowrap logo-img text-center d-block py-3 w-100">
                   <img src="../Assets/Images/synnex_logo.png" width="300" alt="">
                 </a>
-                <!-- <p class="text-center">Elevate Your Business with Synnex Cloud POS</p> -->
-                <?php  
-                if (isset($_SESSION['user_error'])) 
-                {
-                  if ($_SESSION['user_error']==0) 
-                  {
-                    ?>
-                    <p class="text-center" style="color:#ff0000;">Something went wrong, Please try again.</p>
-                    <?php
-                  
-                  }
-                  elseif ($_SESSION['user_error']==1) 
-                  {
-                    ?>
-                    <p class="text-center" style="color:green;">Please check your inbox for the password rest link.</p>
-                    <?php
-                  }
-                  elseif ($_SESSION['user_error']==2) 
-                  {
-                    ?>
-                    <p class="text-center" style="color:#ff0000;">No username/found</p>
-                    <?php
-                  }
-                  elseif ($_SESSION['user_error']==3) 
-                  {
-                    ?>
-                    <p class="text-center" style="color:#ff0000;">Incorrect password</p>
-                    <?php
-                  }
-                  else
-                  {
-                    ?>
-                    <p class="text-center" style="color:#ff0000;">No username/email found</p>
-                    <?php
-                  }
-                  
-                  unset($_SESSION['user_error']);
-                }
-                ?>
-                
-                <form action="../Controller/userController.php" method="POST">
-                  <div class="mb-3">
-                    <label for="user_name" class="form-label">Username/email</label>
-                    <input type="text" name="user_name" class="form-control" id="user_name" maxlength="50" required>
-                  </div>
-                  <div class="d-flex align-items-center justify-content-between mb-4">
-                    <a class="text-primary fw-bold" href="./login.php">Login</a>
-                  </div>
-                  <input type="submit" class="btn btn-primary w-100 py-8 fs-4 mb-4 rounded-2 btn-sign-in" value="Sign In" name="btn_password_change">
-                </form>
+                <!-- Passwords are set by the system admin (Settings -> Users), never reset by email:
+                     see db/SHOP_ACCESS_MODULE.md -->
+                <h5 class="text-center fw-semibold mb-3">Forgot your password?</h5>
+                <p class="text-center mb-4">
+                  Usernames and passwords are issued by your system admin.<br>
+                  Please contact your system admin to reset your password.
+                </p>
+                <a class="btn btn-primary w-100 py-8 fs-4 mb-4 rounded-2 btn-sign-in" href="./login.php">Back to Sign In</a>
               </div>
             </div>
           </div>

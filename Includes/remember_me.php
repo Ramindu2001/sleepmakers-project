@@ -6,23 +6,26 @@
 //user, Admin included, just by setting that cookie. They also used path "/", so every other
 //application on this domain received them and was logged in by them too.
 //
-//The cookies now carry a token signed with a secret that only this server knows (HMAC-SHA256):
+//The cookie now carries a token signed with a secret that only this server knows (HMAC-SHA256):
 //
 //  remember_me_token       v1.<user id>.<expires>.<signature over the user id, expiry and password hash>
-//  remember_me_shop_token  v1.<shop id>.<expires>.<signature over the user id, shop id and expiry>
 //
 //- a token cannot be created or altered without the secret, and cannot be extended
 //- changing a user's password, or disabling the user, signs every remembered browser out
-//- a remembered shop is restored only while that user may still open that shop
-//- the cookies are HttpOnly and scoped to this application's folder
+//- it remembers the main sign in only. A shop is never remembered: every shop entry takes the
+//  username and password (db/SHOP_ACCESS_MODULE.md). The shop cookie an earlier version set
+//  (remember_me_shop_token) is only ever cleared.
+//- the cookie is HttpOnly and scoped to this application's folder
 //- the old cookies are never read again: those browsers simply log in once more
 //
 //The secret is Includes/remember_me_secret.php. It is created on first use and kept out of git;
 //deleting it signs every remembered browser out.
+require_once __DIR__ . '/../Model/shop_access_class.php';
+
 class RememberMe extends Dbh
 {
     const USER_COOKIE = 'remember_me_token';
-    const SHOP_COOKIE = 'remember_me_shop_token';
+    const SHOP_COOKIE = 'remember_me_shop_token';   //set by an earlier version - only ever cleared
     const LIFETIME    = 2592000;    //30 days, as before
 
     //the cookies this replaces - only ever cleared, never trusted
@@ -73,86 +76,11 @@ class RememberMe extends Dbh
         return (int)$user['USID'];
     }//user from cookie
 
-    //remember the shop this user works in, in this browser
-    public function rememberShop($user_id, $shop_id)
-    {
-        if(!$this->canAccessShop($user_id, $shop_id))
-        {
-            return false;
-        }//not a shop this user may open
-
-        $expires = time() + self::LIFETIME;
-        $signature = $this->sign("shop|" . (int)$user_id . "|" . (int)$shop_id . "|" . $expires);
-        if($signature === null)
-        {
-            return false;
-        }//no secret available
-
-        return self::setCookie(self::SHOP_COOKIE, "v1." . (int)$shop_id . "." . $expires . "." . $signature, $expires);
-    }//remember shop
-
-    //the shop this user was working in, or null
-    public function shopFromCookie($user_id)
-    {
-        $token = self::readToken(self::SHOP_COOKIE);
-        if($token === null)
-        {
-            return null;
-        }//no valid looking token
-
-        $expected = $this->sign("shop|" . (int)$user_id . "|" . $token['id'] . "|" . $token['expires']);
-        if($expected === null || !hash_equals($expected, $token['signature']))
-        {
-            return null;
-        }//forged, altered, or remembered for another user
-
-        if(!$this->canAccessShop($user_id, $token['id']))
-        {
-            return null;
-        }//no longer allowed into that shop
-
-        return $token['id'];
-    }//shop from cookie
-
-    //may this user open this shop? The same rule that builds the shop list on the dashboard
-    //(Company::getCompanyByUser): UserType 1 opens every shop, everyone else only the active
-    //shops they are assigned to.
+    //may this user open this shop? The one rule lives in ShopAccess (Model/shop_access_class.php):
+    //UserType 1 opens every shop, everyone else only the active shops they hold an active role in.
     public function canAccessShop($user_id, $shop_id)
     {
-        $user_id = filter_var($user_id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        $shop_id = filter_var($shop_id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-        if($user_id === false || $shop_id === false)
-        {
-            return false;
-        }//not ids
-
-        $stmt = $this->connect()->prepare("SELECT UserType FROM user WHERE USID = ? AND UserStat = 1;");
-        $stmt->execute([$user_id]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        if($user === false)
-        {
-            return false;
-        }//no such active user
-
-        if($user['UserType'] == 1)
-        {
-            $sql = "SELECT shop.SHID FROM shop
-            INNER JOIN company ON company.CMID = shop.Company_CMID
-            WHERE shop.SHID = ? LIMIT 1;";
-            $params = [$shop_id];
-        }//every shop
-        else
-        {
-            $sql = "SELECT shop.SHID FROM shopusers
-            INNER JOIN shop ON shop.SHID = shopusers.shop_SHID
-            INNER JOIN company ON company.CMID = shop.Company_CMID
-            WHERE shopusers.user_USID = ? AND shopusers.shop_SHID = ? AND shop.ShopStat = 1 LIMIT 1;";
-            $params = [$user_id, $shop_id];
-        }//assigned active shops
-
-        $stmt = $this->connect()->prepare($sql);
-        $stmt->execute($params);
-        return $stmt->fetch(PDO::FETCH_ASSOC) !== false;
+        return (new ShopAccess())->canAccessShop($user_id, $shop_id);
     }//can access shop
 
     //sign this browser out: the remember-me cookies, and the old ones they replace

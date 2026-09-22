@@ -1,6 +1,8 @@
 <?php 
 include '../Includes/includes.php';
 include '../Includes/authcheck.php';
+require_once '../Includes/super_admin.php';
+super_admin_page(); //system admin only, decided before any of the page is sent
 ?>
 <!doctype html>
 <html lang="en">
@@ -75,6 +77,7 @@ include '../Includes/authcheck.php';
                     <div class="row">
                         <div class="col-md-12">
                             <form action="../Controller/userrolecontrol.php" method="POST" class="">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
                                 <div class="mb-3">
                                     <lable class="form-label mb-3">Role Name <span class="text-danger">*</span></lable><br>
                                     <input type="text" class="form-control" placeholder="Eg: Manager" name="role_name" required>

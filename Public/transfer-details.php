@@ -48,6 +48,25 @@ $transfer_header_stat = (string)$headerCheck[0]['TransferStat'];
     include '../View/sidebar.php';
     $feature_id=4;
     include '../Includes/editPermission.php';
+
+    //scanner upload (docs/superpowers/specs/2026-09-22-scanner-upload-design.md), while the
+    //transfer is on hold or pending: the sending shop scans what it sends, the receiving shop
+    //scans what arrived
+    require_once '../Includes/scan_upload.php';
+    $scanAccess = new ShopAccess();
+    $scan_upload = null;
+    if($transfer_header_stat <= 1 && $headerCheck[0]['TransferFrom'] == $shop_id
+        && $scanAccess->hasFeatureRight($_SESSION['user_id'], $shop_id, TransferScan::FEATURE, TransferScan::SEND_RIGHTS))
+    {
+        $scan_upload = ['context' => 'transfer_send', 'doc_id' => $transfer_header_id, 'title' => $headerCheck[0]['TransferNo'],
+            'apply_label' => 'Add to Transfer', 'button' => 'Scan / Upload'];
+    }//sending shop
+    elseif($transfer_header_stat <= 1 && $headerCheck[0]['TransferTo'] == $shop_id
+        && $scanAccess->hasFeatureRight($_SESSION['user_id'], $shop_id, TransferScan::FEATURE, TransferScan::RECEIVE_RIGHTS))
+    {
+        $scan_upload = ['context' => 'transfer_receive', 'doc_id' => $transfer_header_id, 'title' => $headerCheck[0]['TransferNo'],
+            'apply_label' => 'Apply received quantities', 'button' => 'Scan received items'];
+    }//receiving shop
     ?>
     <!--  Sidebar End -->
     <!--  Main wrapper -->
@@ -203,6 +222,11 @@ $transfer_header_stat = (string)$headerCheck[0]['TransferStat'];
             </div>
             </div>
 
+            <?php if($scan_upload !== null) { ?>
+            <div class="d-flex justify-content-end mb-2">
+                <button type="button" class="btn btn-outline-primary btn-scan-upload"><i class="ti ti-barcode"></i> <?= htmlspecialchars($scan_upload['button']) ?></button>
+            </div>
+            <?php } ?>
             <!------------------------------------- Add Transfer Items ------------------------------------->
             <div class="card">
                 <div class="card-body">
@@ -895,8 +919,17 @@ $transfer_header_stat = (string)$headerCheck[0]['TransferStat'];
     <?php include '../View/footer.php';?> 
     <!-- footer End  -->
 
-    <script src="../Assets/jquery/transfer_details.js?v=20260911"></script>
+    <script src="../Assets/jquery/transfer_details.js?v=20260922"></script>
     <script src="../Assets/libs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <?php
+    if($scan_upload !== null)
+    {
+        include '../View/modals/scan-upload.php';
+        ?>
+    <script src="../Assets/jquery/scan_upload.js?v=20260922"></script>
+        <?php
+    }//scanner upload
+    ?>
     <script src="../Assets/js/sidebarmenu.js"></script>
     <script src="../Assets/js/app.min.js"></script>
     <script src="../Assets/libs/apexcharts/dist/apexcharts.min.js"></script>

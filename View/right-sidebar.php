@@ -4,7 +4,9 @@ $hasPrescription=$shopObj->hasPrescription($shop_id);
 $user_id = $_SESSION['user_id'];
 $user = $userObj->getOneUser($user_id);
 $userType = $user[0]['UserType'];
-$userRole_id=$user[0]['UserRoles_URID'];
+//a super admin is not limited by roles and keeps their own; everyone else gets the role they
+//hold in the current shop (Model/shop_access_class.php) - 0 matches no rights
+$userRole_id = $userType == 1 ? $user[0]['UserRoles_URID'] : (int) (new ShopAccess())->getShopRoleId($user_id, $shop_id);
 $counterObj = new Counter();
 $counterData = $counterObj->getCounterByUserID($user_id,$shop_id);
 ?>

@@ -22,7 +22,7 @@ $userType = $userData[0]['UserType'];
 
 $feature_id = 16; //product feature
 //get user role access
-$userData = $userObj->getUserFeatureAccess($user_id,$feature_id);
+$userData = $userObj->getUserFeatureAccess($user_id,$feature_id,$shop_id); //role held in this shop
 if(empty($userData))
 {
     $create = 0;

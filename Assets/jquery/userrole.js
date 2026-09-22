@@ -13,8 +13,9 @@ $(document).ready(function ()
                         data: 
                         {
                             id:id,
-                            status:status
-                        },  
+                            status:status,
+                            csrf_token:$(this).closest('form').find('input[name=csrf_token]').val()
+                        },
                         success: function(data)  
                         {
                             $('#alert').html(data);

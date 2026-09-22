@@ -11,6 +11,7 @@
             </div>
             <div class="modal-body">
                 <form action="../Controller/userController.php" method="POST" id="form-user" enctype="multipart/form-data">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrf_token()) ?>">
                     <div class="row">
                         <div class="col-md-6">
                             <input type="hidden" name="euid" id="e-pwd-change-id">

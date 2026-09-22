@@ -7,6 +7,18 @@ db/*
 !db/barcode_module.sql
 !db/barcode_module_install.php
 !db/BARCODE_MODULE.md
+!db/shop_access_migration.php
+!db/shop_access_install.php
+!db/shop_access_module.sql
+!db/SHOP_ACCESS_MODULE.md
+!db/scan_upload_migration.php
+!db/scan_upload_install.php
+!db/scan_upload.sql
+!db/SCAN_UPLOAD_MODULE.md
+!db/customer_orders_migration.php
+!db/customer_orders_install.php
+!db/customer_orders.sql
+!db/CUSTOMER_ORDERS_MODULE.md
 /*.sql
 
 .env
@@ -23,3 +35,7 @@ Includes/remember_me_secret.php
 
 # Server database credentials read by Includes/config.php. Each server has its own.
 Includes/db_credentials.php
+
+# PHPUnit (tools/get-phpunit.sh) and its cache
+tools/phpunit.phar
+.phpunit.cache/
