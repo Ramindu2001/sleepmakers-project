@@ -271,6 +271,27 @@ try {
     check('the session is now bob\'s (Store Keeper in the showroom sees Store)', sees($b, 'store.php'), $b);
     check('bob\'s login is logged', $fx->lastLogin('bob') === $before + 1);
 
+    echo "Access re-checked\n";
+    signIn($b, 'e2e_alice', $pw);
+    shopLogin($b, $W, 'e2e_alice', $pw);
+    $fx->setActive('alice', 'W', 0);
+    $b->get('Public/home.php');
+    check('revoked access sends alice back to the shop screen on her next click', $b->isOn('Public/dashboard.php'), $b);
+    check('and tells her why', $b->has('Your access to this shop has been removed.'), $b);
+    check('the revoked shop is no longer offered', !$b->has('e2e Warehouse') && $b->has('e2e Showroom'), $b);
+    $fx->setActive('alice', 'W', 1);
+
+    shopLogin($b, $W, 'e2e_alice', $pw);
+    $fx->setActive('alice', 'W', 0);
+    $b->post('Includes/newauthcheck.php', []);
+    check('an idle screen\'s poll also reports the lost access (-1)', trim($b->body) === '-1', $b);
+    $fx->setActive('alice', 'W', 1);
+
+    signIn($b, 'e2e_alice', $pw);
+    shopLogin($b, $W, 'e2e_alice', $pw);
+    //the menu label, not the URL: the session poll's JavaScript names switchshop.php on every page
+    check('Switch Shop is offered to a normal user', $b->has('>Switch Shop</p>'), $b);
+
     //scenarios of later tasks are added above this line
 } finally {
     $fx->down();

@@ -100,17 +100,11 @@
                 <i class="ti ti-user " style="font-size:12px;"></i>
                 <p class="mb-0" style="font-size:12px;">My Profile</p>
               </a>
-              <?php 
-              if($userType==1)
-              {
-                ?>
-                <a href="../Public/switchshop.php" class="d-flex align-items-center gap-2 dropdown-item" style="padding:5px 16px !important;">
-                  <i class="ti ti-arrows-exchange-2" style="font-size:12px;"></i>
-                  <p class="mb-0" style="font-size:12px;">Switch Shop</p>
-                </a>
-                <?php
-              }
-              ?>
+              <!-- every user: move to another of their shops, or hand the counter over (db/SHOP_ACCESS_MODULE.md) -->
+              <a href="../Public/switchshop.php" class="d-flex align-items-center gap-2 dropdown-item" style="padding:5px 16px !important;">
+                <i class="ti ti-arrows-exchange-2" style="font-size:12px;"></i>
+                <p class="mb-0" style="font-size:12px;">Switch Shop</p>
+              </a>
               <a href="javascript:void(0)" id="user-password-change" class="d-flex align-items-center gap-2 dropdown-item" style="padding:5px 16px !important;">
               <i class="ti ti-user " style="font-size:12px;"></i>
               <p class="mb-0" style="font-size:12px;">Password Change</p>

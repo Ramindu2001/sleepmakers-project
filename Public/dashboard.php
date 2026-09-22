@@ -131,6 +131,18 @@ function dashboard_js($value)
       <div class="container-fluid">
         <div class="card">
           <div class="card-body">
+            <?php
+            if(isset($_SESSION['shop_access_error']))
+            {
+              ?>
+              <div class="alert alert-danger alert-dismissible bg-danger text-white border-0 fade show" role="alert">
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                <?=htmlspecialchars($_SESSION['shop_access_error'])?>
+              </div>
+              <?php
+              unset($_SESSION['shop_access_error']);
+            }//access removed while in a shop
+            ?>
             <h5 class="card-title fw-semibold mb-4"><?=htmlspecialchars($shops[0]['ComName'])?></h5>
             <p class="mb-0">Please Select Your Shop</p>
 

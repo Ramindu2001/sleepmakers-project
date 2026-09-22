@@ -54,4 +54,15 @@ else
     header("Location: ../Public/dashboard.php");
     exit;
 }//else goto dashboard
+
+if(!(new ShopAccess())->canAccessShop($_SESSION['user_id'], $shop_id))
+{
+    //since the shop was entered its access was revoked, or the role, the shop or the user was
+    //switched off: back to the shop screen - see db/SHOP_ACCESS_MODULE.md
+    RememberMe::forgetShop();
+    unset($_SESSION['shop_id']);
+    $_SESSION['shop_access_error'] = "Your access to this shop has been removed.";
+    header("Location: ../Public/dashboard.php");
+    exit;
+}//no longer allowed in this shop
 ?>

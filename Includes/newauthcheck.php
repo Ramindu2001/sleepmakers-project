@@ -3,6 +3,7 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 include "../Includes/includes.php";
+$shopObjAccess = new ShopAccess();
 $designation = 0;
 $shop_id = 0;
 $user_name = "";
@@ -87,5 +88,11 @@ else
 {
     $login=0;
 }
+if($login==1 && isset($_SESSION['shop_id']) && !$shopObjAccess->canAccessShop($_SESSION['user_id'], $_SESSION['shop_id']))
+{
+    //access to this shop revoked since it was entered: the page goes to switchshop.php
+    $_SESSION['shop_access_error'] = "Your access to this shop has been removed.";
+    $login=-1;
+}//still allowed in this shop
 echo $login;
 ?>
