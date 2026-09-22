@@ -1,0 +1,31 @@
+.btn_duration{
+    border: 2px solid dodgerblue;
+    background-color: inherit;
+    padding: 5px 10px;
+    border-radius: 5px;
+    transition: 0.2s;
+}
+
+.btn_duration:hover{
+    background-color: aliceblue;
+}
+
+#div_other_charts{
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+}
+
+/*-------------------Donut Chart --------------------*/
+#btn_refresh_donut{
+    border: none;
+    background-color: inherit;
+}
+#btn_refresh_line{
+    border: none;
+    background-color: inherit;
+}
+.img_refresh{
+    width: 30px;
+    height: auto;
+}

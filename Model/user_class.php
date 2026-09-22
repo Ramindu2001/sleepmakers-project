@@ -1,0 +1,277 @@
+<?php 
+
+class User extends Dbh
+{
+    public function check_username($username,$UserEmail)
+    {
+            $sql="SELECT * FROM user WHERE UserName=? OR UserEmail=?";
+            $stmt = $this->connect()->prepare($sql);
+            $stmt->execute([$username,$UserEmail]);
+        
+        $count= $stmt->fetchColumn();
+        
+        if ($count>0) 
+        {
+            return 0;
+        }
+        else 
+        {
+            return 1;
+        }
+    }
+
+    public function checkusertype($USID)
+    {
+        $sql="SELECT * FROM user WHERE USID=? ";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$USID]);
+    
+        $count= $stmt->fetchAll();
+        return $count[0]["UserType"];
+    }
+
+    public function getUsername($username)
+    {
+        $sql="SELECT * FROM user WHERE UserName=?";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$username]);
+    
+        $count= $stmt->fetchColumn();
+        
+        if ($count>0) 
+        {
+            return 0;
+        }
+        else 
+        {
+            return 1;
+        }
+    }
+    public function edit_check_username($username,$uid)
+    {
+        // $sql="SELECT COUNT(*)  FROM user WHERE  UserName=? AND USID!=?;";
+        // $stmt = $this->connect()->prepare($sql);
+        // $stmt->execute([$username,$uid]);
+        
+        $sql = "SELECT count(*) FROM user WHERE UserName=? AND USID!=? AND UserStat=1;";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$username,$uid]);
+        $count= $stmt->fetchColumn();
+        
+        if ($count==0) 
+        {
+            return 1;
+        }
+        else 
+        {
+            return 0;
+        }
+
+    }
+    public function edit_user($uid,$username,$userEmail,$userContact,$userRole,$eprofile,$epaylimit,$status)
+    {
+        $check_username=$this->edit_check_username($username,$uid);
+        if ($check_username==0) 
+        {
+            return $check_username;
+        }
+        else
+        {
+            $sql = "UPDATE user SET `UserProfile`=?,`UserName`=?,`UserEmail`=?,`ContactNo`=?,`UserRoles_URID`=?,`paylimit`=?,UserStat=? WHERE USID=?;";
+            $stmt = $this->connect()->prepare($sql);
+            $stmt->execute([$eprofile,$username,$userEmail,$userContact,$userRole,$epaylimit,$status,$uid]);
+            return 1;
+        }
+        
+    }
+    public function change_password($password,$uid)
+    {
+
+        $sql="UPDATE user SET UserPwd=? WHERE USID=?;";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$password,$uid]);
+        return 1;
+    }
+    public function select_all_users_with_role($userType)
+    {
+        if($userType==1)
+        {
+            $sql="SELECT u.*,ur.* FROM `user` u inner join userroles ur ON u.UserRoles_URID=ur.URID";
+        }
+        else
+        {
+          $sql="SELECT u.*,ur.* FROM `user` u inner join userroles ur ON u.UserRoles_URID=ur.URID WHERE u.UserType!=1";
+        }
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+  
+    public function pwd_chng_user($user)
+    {
+
+        $sql="SELECT * FROM user WHERE UserName=? OR UserEmail=?";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$user,$user]);
+        return $stmt->fetchAll();
+    }
+    public function update_token($token,$uid)
+    {
+        $sql="UPDATE user SET PwdChange=? WHERE USID=?";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$token,$uid]);
+        return 1;
+    }
+    public function setUser($profile_image_name, $username, $UserEmail, $UserContact, $hash, $userRole, $type,$paylimit)
+    {
+        $check_username=$this->check_username($username,$UserEmail);
+        if ($check_username==0) 
+        {
+            return 0;
+        }
+        else
+        {    
+            $pdo = $this->connect();
+            $sql = "INSERT INTO `user`( `UserProfile`, `UserName`, `UserEmail`, `ContactNo`, `UserPwd`, `UserRoles_URID`,`UserType`,`paylimit`) VALUES (?,?,?,?,?,?,?,?);";
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$profile_image_name, $username, $UserEmail, $UserContact, $hash, $userRole, $type,$paylimit]);
+            return $pdo->lastInsertId();
+        }
+    }
+
+    public function getUserByName($username)
+    {
+        $sql = "SELECT * FROM user WHERE UserName = ?;";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$username]);
+        return $stmt->fetchAll();
+    }//get user by name
+
+//=========================== User Log ==============================//
+    public function setUserLog($logStart, $logEnd, $logStat, $user_USID)
+    {
+        //ULID, logStart, logEnd, logStat, user_USID
+        $sql = "INSERT INTO userlog(logStart, logEnd, logStat, user_USID) VALUES(?,?,?,?);";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$logStart, $logEnd, $logStat, $user_USID]);
+    }//set user log
+
+    public function CheckUserRoleStatus($userRoleID)
+    {
+        $sql = "SELECT * FROM userroles WHERE URID = ? AND ur_status=1;";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$userRoleID]);
+        return $stmt->fetchAll();   
+    }//set user log
+
+    public function editUserLog($log_out_time, $user_id)
+    {
+        $sql = "UPDATE userlog SET LogOutTime = ? , LogStat = 2 WHERE Users_USID = ?;";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$log_out_time, $user_id]);
+    }//edit user log
+
+    public function editUserLogStat($user_id)
+    {
+        $sql = "UPDATE userlog SET logStat = 2 WHERE ULID = ?;";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$user_id]);
+    }//edit user log 
+
+    public function getOneUser($user_id)
+    {
+        $sql = "SELECT * FROM user WHERE USID = ? LIMIT 1;";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$user_id]);
+        return $stmt->fetchAll();   
+    }//get user by name
+
+    public function getUserRoleModuleAccess($userRole_id)
+    {
+        $sql = "SELECT * FROM `usermoduleaccess` WHERE UserRoles_URID=?";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$userRole_id]);
+        return $stmt->fetchAll();   
+    }
+
+    public function userAcces($userRole_id,$feature_id)
+    {
+        $sql = "SELECT * FROM `userroleaccess` WHERE UserRolls_URID=? AND SysFeatures_SFID=?";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$userRole_id,$feature_id]);
+        $data=$stmt->fetchAll();
+        return $data;
+    }
+
+    public function getUserRoleFeatureAccess($userRole_id,$feature_id)
+    {
+        $sql = "SELECT * FROM `userroleaccess` WHERE UserRolls_URID=? AND SysFeatures_SFID=?";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$userRole_id,$feature_id]);
+        return $stmt->fetchAll();   
+    }
+
+    public function getRoleViewAccess($userRole_id,$feature_id)
+    {
+        $sql = "SELECT * FROM `userroleaccess` WHERE UserRolls_URID=? AND SysFeatures_SFID=?";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$userRole_id,$feature_id]);
+        $data = $stmt->fetchAll(); 
+        $access = empty($data[0]['is_view']) ? 0 : 1;
+        return $access;
+    }
+
+    public function getUserFeatureAccess($user_id,$feature_id)
+    {
+        $sql = "SELECT RAID, is_create, is_edit, is_view, is_delete, is_verify, is_print, UserRolls_URID, SysFeatures_SFID FROM userroleaccess
+        INNER JOIN userroles ON userroles.URID = userroleaccess.UserRolls_URID
+        INNER JOIN user ON user.UserRoles_URID = userroleaccess.UserRolls_URID
+        WHERE USID = ? AND SysFeatures_SFID = ?;";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$user_id,$feature_id]);
+        $data = $stmt->fetchAll(); 
+        
+        return $data;
+    }
+
+    protected function getLogByUserID($user_id)
+    {
+        $sql = "SELECT * FROM userlog WHERE Users_USID = ? AND LogStat = 1;";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$user_id]);
+        return $stmt->fetchAll();
+    }//get user by name
+    
+    protected function getUserByQuery($sql)
+    {
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }//get user by name
+
+//=========================== User Roles =============================//
+    public function getUserRoles()
+    {
+        $sql = "SELECT * FROM userroles;";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }//get users rolse
+
+    public function delete_user($user_id)
+    {
+        $sql="UPDATE user SET UserStat=0 WHERE USID=?;";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$user_id]);
+        return 1;
+    }
+
+    public function activate_user($user_id)
+    {
+        $sql="UPDATE user SET UserStat=1 WHERE USID=?;";
+        $stmt = $this->connect()->prepare($sql);
+        $stmt->execute([$user_id]);
+        return 1;
+    }
+
+}//class user

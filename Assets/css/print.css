@@ -1,0 +1,38 @@
+#shop-name,
+#shop-location {
+    display: none;
+}
+
+@media print {
+    #shop-name,
+    #shop-location,
+    #report-title {
+        display: block;
+    }
+    .left-sidebar, 
+    header, 
+    .card-title, 
+    #right-sidebar, 
+    .py-6, 
+    #btn_grn_print {
+        display: none;
+    }
+    .body-wrapper {
+        margin: 0 !important;
+    }
+    .container-fluid {
+        padding-top: 0;
+    }
+    .card {
+        box-shadow: none;
+    }
+    .card-body, 
+    #main-wrapper[data-layout=vertical][data-header-position=fixed] .body-wrapper>.container-fluid {
+        padding: 0;
+    }
+    #header{
+        display: inline;
+        padding-left: 10px; 
+        
+    }
+}

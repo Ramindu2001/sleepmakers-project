@@ -1,0 +1,568 @@
+.menu-icon {
+  width: 24px !important;
+  height: 24px !important;
+  margin-right: 12px;
+}
+
+.select2-container--default .select2-selection--single {
+  border: none !important;
+}
+span.select2-dropdown.select2-dropdown--below {
+  margin-top: -13px;
+}
+.select2-container--default {
+  padding: 8px 16px;
+  font-size: 0.875rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: #5a6a85;
+  background-color: transparent;
+  background-clip: padding-box;
+  border: 1px solid #dfe5ef;
+  appearance: none;
+  border-radius: 7px;
+}
+.select2-container--default .select2-selection--single {
+  background-color: #fff0 !important;
+}
+td#w-100 {
+  width: 75px;
+  text-align: center;
+}
+.toast-onload {
+  position: fixed;
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 999;
+  max-width: 300px;
+  width: 100%;
+  transition: all 0.5s;
+}
+#btn:disabled {
+  cursor: not-allowed;
+}
+a {
+  cursor: pointer;
+}
+.text-danger {
+  color: #ff0000 !important;
+  font-weight: 700;
+}
+.danger-alert {
+  color: #ff0000 !important;
+  font-weight: 700;
+  display: block;
+  text-align: center;
+  width: 100%;
+}
+.card {
+  margin-bottom: 30px;
+  background: white;
+}
+#border-left {
+  border-left: 1px solid #e7e7e7;
+}
+.sidebar-nav li > .has-arrow.active::after {
+  top: 18px;
+  margin-top: 1px;
+  border-color: var(--bs-white);
+  transform: rotate(-135deg) translate(0, -50%);
+}
+.sidebar-nav .has-arrow::after {
+  position: absolute;
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-width: 1px 0 0 1px;
+  border-style: solid;
+  border-color: var(--bs-dark-text-emphasis);
+  margin-left: 10px;
+  transform: rotate(135deg) translate(0, -50%);
+  transform-origin: top;
+  top: 22px;
+  right: 15px;
+  transition: all 0.3s ease-out;
+}
+.footer {
+  width: 100%;
+  position: fixed;
+  margin-top: 42vh;
+}
+.footer p {
+  color: #2a3547;
+  font-weight: 600;
+  margin-left: 270px;
+  margin-bottom: 0;
+}
+.dt-button {
+  position: reltive;
+  top: auto;
+  justify-content: center;
+}
+.full {
+  width: 100%;
+  height: 100vh;
+  background-color: black;
+}
+a.sidebar-link2.active {
+  background-color: #355db1 !important;
+}
+a.sidebar-link3.active {
+  background-color: #ed1d37c4 !important;
+}
+img.rounded-circle {
+  box-shadow: 5px 4px 9px;
+}
+.body-wrapper {
+  transition: ease 0.5s;
+}
+#ajaxshow {
+  display: none;
+}
+.table > :not(caption) > * > * {
+  padding: 10px;
+}
+@media only screen and (max-width: 480px) {
+  #header-shortcuts {
+    display: none;
+  }
+}
+button#synnex_shop:hover {
+  background-color: #0072bc !important;
+}
+button#synnex_shop:hover h6.card-title.mb-4.text-center {
+  color: #fff !important;
+}
+
+@media only screen and (max-width: 600px) {
+  .laptop {
+    display: none !important;
+  }
+}
+
+.h5,
+h5 {
+  font-size: 15px !important;
+}
+.d-fixed {
+  position: fixed;
+  top: 90px;
+  right: -150px;
+  width: 200px;
+  z-index: 999;
+  transition: 0.5s ease-in-out;
+  background-color: #5d87ff;
+  border-radius: 10px 0 0 10px;
+  box-shadow: -3px 0 15px rgba(0, 0, 0, 0.15);
+}
+
+.d-fixed .hide-menu {
+  white-space: nowrap;
+}
+
+/* Right sidebar POS tab on the edge */
+.right-sidebar-tab {
+  position: absolute;
+  left: -50px;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  padding: 8px 4px;
+  background-color: #5d87ff;
+  color: #fff;
+  text-decoration: none;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  border-radius: 8px 0 0 8px;
+  cursor: pointer;
+  box-shadow: -2px 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 1;
+  transition: background-color 0.3s;
+  gap: 3px;
+}
+.right-sidebar-tab:hover {
+  background-color: #4a73e8;
+  color: #fff;
+  text-decoration: none;
+}
+
+.prd-lable {
+  overflow: hidden; /* Hide the overflow */
+  text-overflow: ellipsis; /* Add ellipsis (...) */
+  white-space: nowrap;
+  width: 100%;
+  font-size: 0.8rem;
+  text-transform: capitalize;
+}
+.modal-content {
+  background: #fff;
+}
+.btn-default {
+  background-color: #0072bc;
+  color: #fff;
+  margin: 5px;
+}
+.d-fixed:hover {
+  right: 0;
+}
+.d-fixed div .sidebar-nav #sidebarnav .sidebar-item a.sidebar-link {
+  color: white !important;
+}
+.d-fixed div .sidebar-nav #sidebarnav .sidebar-item a.sidebar-link:hover {
+  color: white !important;
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+li.sidebar-item {
+  transition: 0.5s ease;
+  position: relative;
+  top: 0;
+  margin-bottom: 5px !important;
+}
+li.sidebar-item:hover {
+  top: 0;
+}
+/* .nav-icon-hover img {
+    box-shadow: 4px 6px 12px;
+    border-radius: 5px;
+} */
+textarea.form-control {
+  height: 17px;
+}
+.mr-1 {
+  margin-right: 10px;
+}
+td.last {
+  text-align: center;
+}
+span.hide-menu {
+  font-size: 14.5px !important;
+  font-weight: 500;
+}
+td,
+th {
+  font-size: 12px;
+}
+.card-title {
+  font-size: 15px;
+}
+.left-sidebar {
+  border-radius: 0 15px 0 0;
+  box-shadow: 0 25px 35px #0000002e;
+  font-family: "Nunito Sans", sans-serif;
+  height: 100vh;
+}
+.left-sidebar .scroll-sidebar {
+  padding: 0 24px 80px 0;
+  height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+.cart-input {
+  padding: 4px 8px;
+}
+#sub-quantity,
+#add-quantity {
+  padding: 3.5px !important;
+}
+.tr-cart td {
+  padding: 5px;
+}
+tr.tr-cart {
+  border: none;
+}
+#cart-table td {
+  padding: 5px;
+}
+#w-140 {
+  width: 120px;
+}
+.center {
+  display: block;
+  margin: auto;
+  width: 60%;
+}
+#cart-table th {
+  padding: 5px;
+  text-align: center;
+}
+.btn-danger {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: #f70000;
+  --bs-btn-border-color: #f70000;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #dd0b0b;
+  --bs-btn-hover-border-color: #dd0b0b;
+  --bs-btn-focus-shadow-rgb: 251, 155, 129;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #dd0b0b;
+  --bs-btn-active-border-color: #dd0b0b;
+  --bs-btn-active-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.125);
+  --bs-btn-disabled-color: #fff;
+  --bs-btn-disabled-bg: #a3a3a3;
+  --bs-btn-disabled-border-color: #a3a3a3;
+}
+.sidebar-nav ul .sidebar-item .sidebar-link {
+  border-radius: 0 27px 27px 0;
+  padding: 10px 15px !important;
+  display: flex;
+  align-items: center;
+}
+
+.sidebar-nav ul .sidebar-item .sidebar-link.active,
+.sidebar-nav ul .sidebar-item .sidebar-link.active .hide-menu {
+  color: #ffffff !important;
+}
+
+#sidebarnav .nav-small-cap,
+li.nav-small-cap {
+  display: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  height: 0 !important;
+  line-height: 0 !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+table {
+  width: 100%;
+  margin-bottom: 10px;
+  /* border: 1px solid; */
+}
+.body-wrapper > .container-fluid {
+  max-width: none !important;
+}
+.quantity {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  /* background-color: green; */
+  color: #fff;
+  height: 40px;
+  width: 40px;
+  border-radius: 50%;
+  z-index: 1;
+}
+#add-product-modal {
+  color: var(--bs-modal-color);
+}
+.quantity span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-weight: 600;
+}
+input#product_price,
+#discount_percentage,
+#discount_value {
+  width: 80px;
+  padding: 5px 5px;
+  border: none;
+  background: white;
+}
+#text-right {
+  text-align: right;
+}
+#discount_percentage {
+  border: 1px solid grey;
+  /* background:#f5f5f5; */
+}
+div#cart-foot {
+  border-top: 1px solid #e7e7e7;
+}
+#cart .table-responsive {
+  height: 20vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+/* width */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  background: #4a6ccc;
+  border-radius: 10px;
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+div#categories,
+#product-main {
+  height: 70vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.5rem !important;
+}
+td {
+  padding: 16px;
+}
+th {
+  padding: 16px 16px;
+}
+tr {
+  border-bottom: 1px solid #e7e7e7;
+}
+
+.form-check-input[type="checkbox"] {
+  border-radius: 0.25em;
+  box-shadow: 1px 1px 3px #000000c7;
+}
+.bg-danger {
+  --bs-bg-opacity: 1;
+  background-color: #ff0000 !important;
+}
+
+.form-check-input[type="checkbox"] {
+  border-radius: 1.25em !important;
+  box-shadow: 1px 1px 3px #000000c7;
+}
+.search_select_box select {
+  width: 100%;
+}
+img#eilogo {
+  border-radius: 50%;
+  height: 150px;
+  width: 150px;
+  box-shadow: 7px 5px 9px #000000b5;
+}
+
+/* -------------- Product Image --------------*/
+#img_product {
+  max-width: 200px;
+  max-height: 200px;
+}
+
+.brand-logo {
+  margin-bottom: 30px !important;
+  padding-bottom: 10px !important;
+}
+
+/* ===== Sidebar Sub-Menu Visibility Fixes ===== */
+
+/* CRITICAL: Override framework white-space:nowrap that causes text to hide */
+.sidebar-nav ul .sidebar-item .sidebar-link {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  flex-wrap: wrap !important;
+}
+
+/* All hide-menu spans must be visible */
+.sidebar-nav .hide-menu {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  display: inline !important;
+  word-break: normal !important;
+  line-height: 1.4 !important;
+}
+
+/* First level dropdown - reduce left padding so text has room */
+.sidebar-nav ul .sidebar-item ul.first-level {
+  padding-left: 5px !important;
+}
+
+/* Nested dropdown - minimal additional indent */
+.sidebar-nav ul .sidebar-item ul.first-level ul.first-level {
+  padding-left: 10px !important;
+}
+
+/* Sub-menu links: less padding, smaller text to fit in sidebar */
+.sidebar-nav ul .sidebar-item ul .sidebar-item .sidebar-link {
+  padding: 8px 10px 8px 8px !important;
+  font-size: 13px !important;
+  gap: 8px !important;
+}
+
+/* Third level links even smaller */
+.sidebar-nav ul .sidebar-item ul ul .sidebar-item .sidebar-link {
+  padding: 6px 8px 6px 12px !important;
+  font-size: 12.5px !important;
+  gap: 6px !important;
+}
+
+/* Make the circle/star icons in sub-menus smaller to save space but keep them visible */
+.sidebar-nav ul .sidebar-item ul .round-16 {
+  display: flex !important;
+  min-width: 12px;
+  min-height: 12px;
+  margin-right: 5px !important;
+}
+.sidebar-nav ul .sidebar-item ul .round-16 i {
+  font-size: 10px !important;
+}
+
+/* Keep arrow visible on expandable sub-items */
+.sidebar-nav .sidebar-item .sidebar-link.has-arrow {
+  position: relative;
+  padding-right: 30px !important;
+}
+
+/* Fix arrow position for sub-menu expandable items */
+.sidebar-nav ul .sidebar-item ul .sidebar-link.has-arrow::after {
+  right: 10px !important;
+  top: 14px !important;
+}
+
+/* Ensure collapsed sub-menus toggle properly */
+.sidebar-nav ul .sidebar-item ul.collapse.show,
+.sidebar-nav ul .sidebar-item ul.collapse.in {
+  overflow: visible !important;
+}
+
+/* Left sidebar scroll - no horizontal overflow */
+.left-sidebar .scroll-sidebar {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+/* Active state colors for main menu items */
+.sidebar-nav ul#sidebarnav > .sidebar-item > .sidebar-link.active,
+.sidebar-nav ul#sidebarnav > .sidebar-item > .sidebar-link.active:hover {
+  background-color: #5D87FF !important;
+  color: #ffffff !important;
+  border-radius: 7px;
+}
+
+.sidebar-nav ul#sidebarnav > .sidebar-item > .sidebar-link.active .hide-menu,
+.sidebar-nav ul#sidebarnav > .sidebar-item > .sidebar-link.active:hover .hide-menu,
+.sidebar-nav ul#sidebarnav > .sidebar-item > .sidebar-link.active i,
+.sidebar-nav ul#sidebarnav > .sidebar-item > .sidebar-link.active:hover i {
+  color: #ffffff !important;
+  background-color: transparent !important;
+}
+
+/* Active state colors for sub-menu items */
+.sidebar-nav ul .sidebar-item ul .sidebar-item .sidebar-link.active,
+.sidebar-nav ul .sidebar-item ul .sidebar-item .sidebar-link.active .hide-menu {
+  color: #5d87ff !important;
+}
+
+/* Fix hover state for inactive sidebar items so text doesn't disappear */
+.sidebar-nav ul .sidebar-item .sidebar-link:not(.active):hover {
+  background-color: rgba(93, 135, 255, 0.1) !important;
+  color: #5D87FF !important;
+  border-radius: 7px;
+}
+
+.sidebar-nav ul .sidebar-item .sidebar-link:not(.active):hover .hide-menu,
+.sidebar-nav ul .sidebar-item .sidebar-link:not(.active):hover i {
+  color: #5D87FF !important;
+  background-color: transparent !important;
+}

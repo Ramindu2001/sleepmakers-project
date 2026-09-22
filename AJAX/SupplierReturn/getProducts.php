@@ -1,0 +1,33 @@
+<?php 
+session_start();
+include "../../Includes/config.php";
+include "../../Model/DB_Class.php";
+
+$shop_id = $_SESSION['shop_id'];
+
+if($_GET['type'] == 'item_search')
+{
+    $txt_search = !empty($_GET['search']) ? $_GET['search']: '';
+    $shop_id = isset($_SESSION['shop_id']) ? $_SESSION['shop_id']: '0';
+
+    $sql = "SELECT * FROM products p
+    INNER JOIN inventory i ON i.products_PDID=p.PDID
+    WHERE concat(p.Barcode, p.ItemName) LIKE '%".$txt_search."%' AND i.shop_SHID=".$shop_id." AND CurrentQty>0;";
+    
+    $dbObj = new DBTransactions();
+    $itemData = $dbObj->getData($sql);
+
+    if(!empty($itemData))
+    {
+        $itemResult = array();
+        foreach($itemData as $row)
+        {
+            $data['id'] = $row['PDID'];
+            $data['text'] = $row['Barcode'] ." - ". $row['ItemName'];
+
+            array_push($itemResult, $data);
+        }//foreach
+
+    }//has items
+    echo json_encode($itemResult);
+}//has type

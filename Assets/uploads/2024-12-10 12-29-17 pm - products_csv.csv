@@ -1,0 +1,82 @@
+Barcode *,ItemName *,ProdDescription *,SecondName *,ProdPurchasePrice *,ProdSellPrice*,Subcategories_SCID*
+PD_000001,Melwa Gypsum,Boards for partitions and mouldings . (not waterproof),Melwa Gypsum,2600,2850,8 x 4
+PD_000003,Sample Product,Sample Product,Sample Product,500,800,9 x 4
+PD_000004,4.5mm  Calcium Cilicate,El Toro Branded calcium cilicate  boards for partition and ceiling ,4.5mm  Calcium Cilicate,2478,2700,10 x 4
+PD_000005,6mm Calcium Cilicate,El Toro Branded calcium Cilicate  boards for partition and ceiling ,6mm Calcium Cilicate,3355,3700,11 x 4
+PD_000006,9mm Calcium Cilicate,El Toro Branded calcium Cilicate  boards for partition and ceiling ,9mm Calcium Cilicate,5025,5450,12 x 4
+PD_000007,Melwa Gypsum 2 x 2 MP 01," Building finish material for walls, ceilings, and partitions. Safety instructions  Wear suitable eye and skin protection. Storage instructions Must be stored in dry conditions.
+  low cost, Ease of installation and finishing  , Sound control.",Melwa Gypsum 2 x 2 MP 01,280,340,13 x 4
+PD_000008,12mm Shutter Board,specially formulated composite panel that has been developed for concrete shuttering and formwork applications. The panel is finished with a phenolic overlay and edge sealed.,12mm Shutter Board,0,12750,14 x 4
+PD_000009,15mm Shutter Board,specially formulated composite panel that has been developed for concrete shuttering and formwork applications. The panel is finished with a phenolic overlay and edge sealed.,15mm Shutter Board,0,14500,15 x 4
+PD_000010,18mm Shutter Board,specially formulated composite panel that has been developed for concrete shuttering and formwork applications. The panel is finished with a phenolic overlay and edge sealed.,18mm Shutter Board,0,17500,16 x 4
+PD_000011,Melwa Gypsum 2 x 2 MP 02A," Building finish material for walls, ceilings, and partitions. Safety instructions  Wear suitable eye and skin protection. Storage instructions Must be stored in dry conditions.
+ low cost, Ease of installation and finishing  , Sound control.",Melwa Gypsum 2 x 2 MP 02A,280,340,17 x 4
+PD_000012,Melwa Gypsum 2 x 2 MP 04," Building finish material for walls, ceilings, and partitions. Safety instructions  Wear suitable eye and skin protection. Storage instructions Must be stored in dry conditions.  low cost, Ease of installation and finishing  , Sound control.",Melwa Gypsum 2 x 2 MP 04,280,340,18 x 4
+PD_000013,Solid Sheet  7ft  height 2mm  Clear,"Manufactured from a light, solid thermoplastic synthetic resin material which is extruded into solid sheets. Advantages are Durability. Light transmission. Easy to cut and shape, Thermal insulation.   Lightweight,  Easy to install, UV protection,
+    Completely water-resistant and   Resistant to Extreme Temperatures.",Solid Sheet  7ft  height 2mm  Clear,0,2400,19 x 4
+PD_000014,EL Toro 2 x 2 plain," EL Toro Fiber Cement Board sheets remain strong against heat and moisture, making them perfect for various indoor spaces like driveways, washrooms, factories, and more, even in wet areas. This product is also known as EL Toro Calcium Silicate board, Super Flex Board & Cement Boards.
+
+
+",EL Toro 2 x 2 plain,0,340,20 x 4
+PD_000015,EL Toro  2 x 2  White," EL Toro Fiber Cement Board sheets remain strong against heat and moisture, making them perfect for various indoor spaces like driveways, washrooms, factories, and more, even in wet areas. This product is also known as EL Toro Calcium Silicate board, Super Flex Board & Cement Boards.
+
+
+",EL Toro  2 x 2  White,0,375,21 x 4
+PD_000016,Solid Sheet  4ft  height 2mm Clear,"Manufactured from a light, solid thermoplastic synthetic resin material which is extruded into solid sheets. Advantages are Durability. Light transmission. Easy to cut and shape, Thermal insulation.   Lightweight,  Easy to install, UV protection,
+Completely water-resistant and   Resistant to Extreme Temperatures.",Solid Sheet  4ft  height 2mm Clear,0,1400,22 x 4
+PD_000017,Solid Sheet  7ft  height 2mm Blue,"Manufactured from a light, solid thermoplastic synthetic resin material which is extruded into solid sheets. Advantages are Durability. Light transmission. Easy to cut and shape, Thermal insulation.   Lightweight,  Easy to install, UV protection,
+ Completely water-resistant and   Resistant to Extreme Temperatures.",Solid Sheet  7ft  height 2mm Blue,0,2400,23 x 4
+PD_000018,Solid Sheet  7ft  height 2mm Brown,"Manufactured from a light, solid thermoplastic synthetic resin material which is extruded into solid sheets. Advantages are Durability. Light transmission. Easy to cut and shape, Thermal insulation.   Lightweight,  Easy to install, UV protection, Completely water-resistant and   Resistant to Extreme Temperatures.",Solid Sheet  7ft  height 2mm Brown,0,2400,24 x 4
+PD_000019,Solid Sheet  7ft  height 2mm Green,"Manufactured from a light, solid thermoplastic synthetic resin material which is extruded into solid sheets. Advantages are Durability. Light transmission. Easy to cut and shape, Thermal insulation.   Lightweight,  Easy to install, UV protection,
+Completely water-resistant and   Resistant to Extreme Temperatures.",Solid Sheet  7ft  height 2mm Green,0,2400,25 x 4
+PD_000020,Solid Sheet  4ft  height 2mm Blue,"Manufactured from a light, solid thermoplastic synthetic resin material which is extruded into solid sheets. Advantages are Durability. Light transmission. Easy to cut and shape, Thermal insulation.   Lightweight,  Easy to install, UV protection,
+Completely water-resistant and   Resistant to Extreme Temperatures.",Solid Sheet  4ft  height 2mm Blue,0,1400,26 x 4
+PD_000021,Solid Sheet  4ft  height 2mm Green,"Manufactured from a light, solid thermoplastic synthetic resin material which is extruded into solid sheets. Advantages are Durability. Light transmission. Easy to cut and shape, Thermal insulation.   Lightweight,  Easy to install, UV protection,
+Completely water-resistant and   Resistant to Extreme Temperatures.",Solid Sheet  4ft  height 2mm Green,0,1400,27 x 4
+PD_000022,Solid Sheet  4ft  height 2mm Brown,"Manufactured from a light, solid thermoplastic synthetic resin material which is extruded into solid sheets. Advantages are Durability. Light transmission. Easy to cut and shape, Thermal insulation.   Lightweight,  Easy to install, UV protection,
+Completely water-resistant and   Resistant to Extreme Temperatures.",Solid Sheet  4ft  height 2mm Brown,0,1400,28 x 4
+PD_000023,Daiken Mineral Fiber 2 X 2,"They provide excellent sound absorption and thermal insulation which makes them an ideal choice for creating a comfortable and noise-controlled environment, especially in air conditioned spaces.",Daiken Mineral Fiber 2 X 2,0,1950,29 x 4
+PD_000024,Mineral Fiber  2 X 2   (P) ,"They provide excellent sound absorption and thermal insulation which makes them an ideal choice for creating a comfortable and noise-controlled environment, especially in air conditioned spaces.",Mineral Fiber  2 X 2   (P) ,0,700,30 x 4
+PD_000025,Daiken Mineral Fiber 4 X 2,"They provide excellent sound absorption and thermal insulation which makes them an ideal choice for creating a comfortable and noise-controlled environment, especially in air conditioned spaces.",Daiken Mineral Fiber 4 X 2,0,2700,31 x 4
+PD_000026,Melamine Board 8X4 6mm (Cherry),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine Board 8X4 6mm (Cherry),0,4400,32 x 4
+PD_000027,Melamine  8X4  9mm (White),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine  8X4  9mm (White),0,5600,33 x 4
+PD_000028,Melamine 8X4  12mm (White),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine 8X4  12mm (White),0,6750,34 x 4
+PD_000029,Melamine 8X4 15mm (White),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine 8X4 15mm (White),0,8450,35 x 4
+PD_000030,Melamine 8X4 18mm (White),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine 8X4 18mm (White),0,9950,36 x 4
+PD_000031,Melamine  8X4   6mm (White),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine  8X4   6mm (White),0,4400,37 x 4
+PD_000032,Melamine 8X4    6mm (Black),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine 8X4    6mm (Black),0,4400,38 x 4
+PD_000033,Melamine 8X4  6mm (Beach),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine 8X4  6mm (Beach),0,4400,39 x 4
+PD_000034,Melamine 8X4  9mm (Black),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine 8X4  9mm (Black),0,5600,40 x 4
+PD_000035,Melamine   8X4  9mm (cherry ),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine   8X4  9mm (cherry ),0,5600,41 x 4
+PD_000036,Melamine  8X4  9mm ( Beach),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine  8X4  9mm ( Beach),0,5600,42 x 4
+PD_000037,Melamine  8X4  12mm ( Black),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine  8X4  12mm ( Black),0,6750,43 x 4
+PD_000038,Melamine  8X4  12mm (cherry ),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine  8X4  12mm (cherry ),0,6750,44 x 4
+PD_000039,Melamine 8X4  12mm (Beach),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine 8X4  12mm (Beach),0,6750,45 x 4
+PD_000040,Melamine 8X4 15mm ( Black),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine 8X4 15mm ( Black),0,8450,46 x 4
+PD_000041,Melamine 8X4  15mm ( Cherry),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine 8X4  15mm ( Cherry),0,8450,47 x 4
+PD_000042,Melamine 8X4  15mm ( Beach),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine 8X4  15mm ( Beach),0,8450,48 x 4
+PD_000043,Melamine 8X4  18mm (Black),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine 8X4  18mm (Black),0,9950,49 x 4
+PD_000044,Melamine 8X4  18mm (Cherry),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine 8X4  18mm (Cherry),0,9950,50 x 4
+PD_000045,Melamine  8X4  18mm (Beach),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine  8X4  18mm (Beach),0,9950,51 x 4
+PD_000046,Melamine Board 8X4   6mm (Cherry),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine Board 8X4   6mm (Cherry),0,4400,52 x 4
+PD_000047,Melamine 8X4   25mm (white),"manufactured wood substrate, which has been coated with melamine laminate. Melamine resin gives the board a highly durable and attractive finish.",Melamine 8X4   25mm (white),0,12650,53 x 4
+PD_000048,MDF 8X4  3mm,,MDF 8X4  3mm,0,1450,54 x 4
+PD_000049,MDF 8X4  6mm,,MDF 8X4  6mm,0,2350,55 x 4
+PD_000050,MDF 8X4  9mm,,MDF 8X4  9mm,0,3400,56 x 4
+PD_000051,MDF 8X4  12mm,,MDF 8X4  12mm,0,4650,57 x 4
+PD_000052,MDF 8X4  15mm,,MDF 8X4  15mm,0,6350,58 x 4
+PD_000053,MDF 8X4   18mm,,MDF 8X4   18mm,0,8250,59 x 4
+PD_000054,MDF 8X4  25mm,,MDF 8X4  25mm,0,10500,60 x 4
+PD_000055,Plywood  8X4  3mm,"These sheets offer strength and stability for a wide range of applications in the construction industry. Common uses include shuttering, formworks, roofing, sheathing, and general structural purposes",Plywood  8X4  3mm,0,1700,61 x 4
+PD_000056,Plywood 8X4 6mm,"These sheets offer strength and stability for a wide range of applications in the construction industry. Common uses include shuttering, formworks, roofing, sheathing, and general structural purposes",Plywood 8X4 6mm,0,2650,62 x 4
+PD_000057,Plywood 8X4 9mm,"These sheets offer strength and stability for a wide range of applications in the construction industry. Common uses include shuttering, formworks, roofing, sheathing, and general structural purposes",Plywood 8X4 9mm,0,2900,63 x 4
+PD_000058,Plywood 8X4  12mm,"These sheets offer strength and stability for a wide range of applications in the construction industry. Common uses include shuttering, formworks, roofing, sheathing, and general structural purposes",Plywood 8X4  12mm,0,3250,64 x 4
+PD_000059,Plywood  8X4   15mm,"These sheets offer strength and stability for a wide range of applications in the construction industry. Common uses include shuttering, formworks, roofing, sheathing, and general structural purposes",Plywood  8X4   15mm,0,4950,65 x 4
+PD_000060,Plywood 8X4  18mm,"These sheets offer strength and stability for a wide range of applications in the construction industry. Common uses include shuttering, formworks, roofing, sheathing, and general structural purposes",Plywood 8X4  18mm,0,5650,66 x 4
+PD_000061,Plywood 8X4 25mm,"These sheets offer strength and stability for a wide range of applications in the construction industry. Common uses include shuttering, formworks, roofing, sheathing, and general structural purposes",Plywood 8X4 25mm,0,9750,67 x 4
+PD_000062,Solid Sheet  4ft  height 3mm Clear, Melwa Gypsum,Solid Sheet  4ft  height 3mm Clear,0,2550,68 x 4
+PD_000063,Solid Sheet  4ft  height 3mm Blue, Melwa Gypsum,Solid Sheet  4ft  height 3mm Blue,0,2550,69 x 4
+PD_000064,Solid Sheet  4ft  height 3mm Brown, Melwa Gypsum,Solid Sheet  4ft  height 3mm Brown,0,2550,70 x 4
+PD_000065,Solid Sheet  4ft  height 3mm Green, Melwa Gypsum,Solid Sheet  4ft  height 3mm Green,0,2550,71 x 4
+PD_000066,Solid Sheet  7ft  height 3mm  Clear, Melwa Gypsum,Solid Sheet  7ft  height 3mm  Clear,0,3400,72 x 4
+PD_000067,Solid Sheet  7ft  height 3mm  Blue, Melwa Gypsum,Solid Sheet  7ft  height 3mm  Blue,0,3400,73 x 4

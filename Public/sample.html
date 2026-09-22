@@ -1,0 +1,137 @@
+<head>
+    <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title> Cloud POS | Synnex Cloud POS</title>
+<link rel="shortcut icon" type="image/png" href="../Assets/Images/favicon.png" />
+<link rel="stylesheet" href="../Assets/css/styles.min.css" />
+
+<script src="../JQuery_361.js"></script>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+
+
+<!-- <script src="https://cdn.ckeditor.com/ckeditor5/41.1.0/classic/ckeditor.js"></script> -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link
+    href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&display=swap"
+    rel="stylesheet">
+
+<!--Added by Imila-->
+<link rel="stylesheet" href="../Assets/css/styles.css">
+<link rel="stylesheet" href="../Assets/css/head.css">
+
+<!-- select 2 added by Chinthana -->
+<link rel="stylesheet" href="../vendor/select2-develop/dist/css/select2.min.css">
+<script src="../vendor/select2-develop/dist/js/select2.min.js"></script>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+
+<!-- <script src="https://cdn.ckeditor.com/ckeditor5/41.1.0/classic/ckeditor.js"></script> -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,200..1000;1,6..12,200..1000&display=swap" rel="stylesheet">
+
+
+<!-- select 2 added by Chinthana -->
+<link rel="stylesheet" href="../vendor/select2-develop/dist/css/select2.min.css">
+<script src="../vendor/select2-develop/dist/js/select2.min.js"></script>
+
+
+</head>
+
+<tbody>
+    <tr id='p_8'>
+        <input type='hidden' name='' id='product_id'>
+        <td> 
+            <input type='hidden' name='product_name[]' id='product_name'>
+            1 Cocacola 1050ml
+        </td>
+        <td>
+            <input type='hidden' name='' value='10' id='available_qty'>
+            10
+        </td>
+        <td id='w-140'>
+            <di class='center'>
+                <input type='hidden' name='cart-quantity[]' value='1' id='cart-quantity'>
+                <a href='javascript:void(0)' class='btn btn-success' id='sub-quantity' onclick=''>-</a>
+                <span id='qty'> 1 </span>
+                <a href='javascript:void(0)' class='btn btn-success' id='add-quantity'>+</a>
+            </di>
+            
+        </td>
+        <td>
+            <input type='text' name='product_price[]' value='1000.00' id='product_price' class='form-control'>
+            <input type='hidden' name='original_product_unit_price[]' value='1000.00' id='original_product_unit_price' class='form-control'>
+            
+        </td>
+        <td>
+            <input type='text' name='discount_percentage[]' value='10' id='discount_percentage' class='form-control'>
+        </td>
+        <td>
+            <input type='text' name='discount_value[]' value='100.00' id='discount_value' class='form-control'>
+        </td>
+        <td>
+            <input type='hidden' name='total_price[]' id='total_price'>
+            900.00
+        </td>
+        <td class='action'>
+            <div class='row action'>
+                <div class='col-md-12'>
+                    <a href='javascript:void(0);' id='remove-cart' class='btn btn-danger mb-1'><i class='ti ti-trash'></i></a>
+                </div>
+            </div>
+        </td>
+    </tr>
+</tbody>
+
+<button id="btn">Add</button>
+<script>
+    $("body #remove-cart").click(function(){
+        alert();
+        $(this).closest("tr").remove();
+    })
+    $("#btn").click(function(){
+        $("body").append("<tr id='p_8'>"+
+            "<input type='hidden' name='' id='product_id'>"+
+        " <td> "+
+                "<input type='hidden' name='product_name[]' id='product_name'>"+
+            "</td>"+
+            "<td>"+
+                "<input type='hidden' name='' value='10' id='available_qty'>"+
+                "10"+
+            "</td>"+
+            "<td id='w-140'>"+
+                "<di class='center'>"+
+                    "<input type='hidden' name='cart-quantity[]' value='1' id='cart-quantity'>"+
+                    "<a href='javascript:void(0)' class='btn btn-success' id='sub-quantity' onclick=''>-</a>"+
+                    "<span id='qty'> 1 </span>"+
+                    "<a href='javascript:void(0)' class='btn btn-success' id='add-quantity'>+</a>"+
+                "</di>"+
+                
+            "</td>"+
+            "<td>"+
+                "<input type='text' name='product_price[]' value='1000.00' id='product_price' class='form-control'>"+
+                "<input type='hidden' name='original_product_unit_price[]' value='1000.00' id='original_product_unit_price' class='form-control'>"+        
+            "</td>"+
+            "<td>"+
+                "<input type='text' name='discount_percentage[]' value='10' id='discount_percentage' class='form-control'>"+
+            "</td>"+
+            "<td>"+
+                "<input type='text' name='discount_value[]' value='100.00' id='discount_value' class='form-control'>"+
+            "</td>"+
+            "<td>"+
+                "<input type='hidden' name='total_price[]' id='total_price'>"+
+                "900.00"+
+            "</td>"+
+            "<td class='action'>"+
+                "<div class='row action'>"+
+                    "<div class='col-md-12'>"+
+                        "<a href='javascript:void(0);' id='remove-cart' class='btn btn-danger mb-1'><i class='ti ti-trash'></i></a>"+
+                    "</div>"+
+                "</div>"+
+            "</td>"+
+        "</tr>")
+    })
+     
+</script>

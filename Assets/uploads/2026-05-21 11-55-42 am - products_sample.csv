@@ -1,0 +1,179 @@
+Barcode *,ItemName *,ProdDescription *,SecondName *,ProdPurchasePrice *,ProdSellPrice*,Subcategories_SCID*
+ooooo1,Maliban Cream Cracker  125G,,, 129.00 ,140,Biscuits
+,Maliban Chocolate Biscuit 100G,,, 120.00 ,130,Biscuits
+,Scan Jumbo Peanut,,, 150.00 ,150,Snack
+,Maliban Custed Cream Biscuit,,, 102.00 ,110,Biscuits
+,Maliban Gold Marie,,, 83.00 ,90,Biscuits
+,maliban Cocolate puff,,, 120.00 ,130,Biscuits
+,Watawala Tea,,, 289.00 ,315,Grocery
+,Raigam Soya Prawns Pkt,,, 145.00 ,170,Grocery
+,Lanka Soy Chicken,,, 140.00 ,150,Grocery
+,Maggi Noodles Chicken,,, 107.00 ,115,Grocery
+,Prima Kottu Mee,,, 127.00 ,135,Grocery
+,Asiri Hot Mixture,,, 120.00 ,120,Snack
+,KELLOGGIS CHOCOS DUET,,, 65.00 ,120,Grocery
+,Milan Spagetti 400g,,, 380.00 ,410,Grocery
+,Roza Pasta(FUSILLI),,, 400.00 ,460,Grocery
+,Rosa Pasta ROZA PASTA (ELBOW),,, 400.00 ,460,Grocery
+,Asiri Coctail Mixture,,, 90.00 ,100,Snack
+,Coca Cola 400ML,,, 180.00 ,200,Beverage
+,Marina Cocount Oil 200ML,,, 385.00 ,415,Grocery
+,Kist Strawberry/ Divul Jam,,, 261.00 ,290,Grocery
+,MD Jam Pineapple 225G,,, 340.00 ,340,Grocery
+,Baby Cheramy Colonge,,, 460.00 ,500,Grocery
+,Baby Sheramy colonge Classic,,, 320.00 ,360,Grocery
+,Ocen Star Jack Mackerel ,,, 240.00 ,240,Grocery
+,Detol Plaster 100strips,,, 17.00 ,20,Grocery
+,PANADOL TAB 156,,, 514.00 ,,Grocery
+,Knorr Chicken Cube 34G,,, 115.00 ,120,Grocery
+,New Ruhunu Salt 400G,,, 110.00 ,120,Grocery
+,Siddhalepa 10G,,, 194.00 ,220,Grocery
+,Eva Cotton Feel Wings,,, 254.00 ,270,Grocery
+,Whisper Skin Love Soft,,, 260.00 ,260,Grocery
+,Samahan pkt,,, 56.00 ,60,Grocery
+,Uswattew Chips Spicy,,, 200.00 ,200,Snack
+,Uswattew Chips Salted,,, 200.00 ,200,Snack
+,Kotmale Fresh Milk 1Lt,,, 530.00 ,550,Beverage
+,Hot Dak Cheese Ramen,,, 570.00 ,595,Food
+,Shin Super Ramen,,, 480.00 ,595,Food
+,Shin 120G Ramen,,, 450.00 ,595,Food
+,Tipex,,, 120.00 ,150,Stationary
+,Pencil Colour 12pc,,, 450.00 ,480,Stationary
+,Pastel Colour 12,,, 160.00 ,195,Stationary
+,Sharpener,,, 80.00 ,120,Stationary
+,Liquid Glue,,, 35.00 ,40,Stationary
+,Balloon 10pc,,, 100.00 ,120,Stationary
+,10 Colour Pen,,, 90.00 ,120,Stationary
+,Bubbles Bottle,,, 55.00 , 70.00 ,Stationary
+,Highlighter Pen Pack,,, 250.00 ,270,Stationary
+,Platinum (bclr),,, 210.00 ,260,Stationary
+,Pen (Blue/Black/Red),,, 20.00 , 20.00 ,Stationary
+,Scissor,,, 70.00 , 90.00 ,Stationary
+,Ruler (Design),,, 50.00 , 65.00 ,Stationary
+,Exercise Book 80pg,,, 55.00 ,80,Stationary
+,Super Glue,,, 65.00 ,80,Stationary
+,Eraser Pack,,, 16.00 , 20.00 ,Stationary
+,Tape,,, 400.00 ,30,Stationary
+,Battery AA,,, 72.00 ,90,Stationary
+,Battery S,,, 192.00 ,240,Stationary
+,Stapler Pin (No.10),,, 25.00 ,100,Stationary
+,Stepler Machine,,, 145.00 ,180,Stationary
+,A7 Note Book,,, 40.00 ,50,Stationary
+,A6 Note Book,,, 60.00 ,70,Stationary
+,Magic Candle,,, 80.00 ,100,Stationary
+,Sling Candle,,, 180.00 , 230.00 ,Stationary
+,Star Candle,,, 200.00 , 260.00 ,Stationary
+,Birthday Cap Normal ,,, 60.00 ,100,Stationary
+,Birthday Cap Bubble,,, 200.00 ,250,Stationary
+,Balloon,,, 200.00 ,220,Stationary
+,Number Candle (N),,, 40.00 ,60,Stationary
+,Number Candle (G),,, 70.00 ,90,Stationary
+,Birthday Crown,,, 250.00 ,270,Stationary
+,Bride-to-be Crown,,, 300.00 ,350,Stationary
+,Paper Plate Printed L,,, 150.00 ,170,Stationary
+,Paper Plate Printed S,,, 120.00 ,150,Stationary
+,Happy Birthday Banner,,, 200.00 ,250,Stationary
+,Sash,,, 200.00 ,240,Stationary
+,Bride Topper,,, 100.00 ,145,Stationary
+,Birthday Topper,,, 200.00 ,240,Stationary
+,Roll,,, 500.00 ,600,Sundry
+,Cling Film,,, 600.00 ,700,Sundry
+,Sweeto Gummies 80g,,, 550.00 , 720.00 ,Food
+,Mentos Roll 29g 14pcs,,, 120.00 ,150,Food
+,Doritos 51.4g,,, 250.00 , 325.00 ,Food
+,Nico Drink Bottle,,, 550.00 , 715.00 ,Beverage
+,Assorted 80/- Items,,, 80.00 , 104.00 ,Other
+,Hop Pop Lollipop 25g 50pcs,,, 70.00 , 90.00 ,Food
+,Dubaco Duo Gofret 36g 24pcs,,, 325.00 , 430.00 ,Food
+,Oreo Biscuit 35g 12pcs,,, 180.00 , 230.00 ,Food
+,Ferrero T3 37.5g,,, 700.00 , 910.00 ,Food
+,Toren Wafer 55g 24pcs,,, 250.00 , 330.00 ,Food
+,Toblerone White 100g,,, 950.00 ," 1,230.00 ",Food
+,Batook Banana/Strawberry 20pcs,,, 50.00 , 70.00 ,Food
+,Cadbury Malaysia 130g,,," 1,100.00 "," 1,430.00 ",Food
+,Twix Chocolate 50g,,, 450.00 , 590.00 ,Food
+,Kinder Bueno Milk 43g,,, 550.00 , 720.00 ,Food
+,Kinder Bueno White 39g,,, 550.00 , 720.00 ,Food
+,Bounty Chocolate 57g,,, 450.00 , 560.00 ,Food
+,Kit Kat 2 Finger UK,,, 180.00 , 240.00 ,Food
+,Mars Chocolate,,, 450.00 , 590.00 ,Food
+,Snickers Chocolate 50g,,, 450.00 , 590.00 ,Food
+,Mirinda Can 320ml,,, 100.00 , 200.00 ,Food
+,Toren Pacimo 24pcs,,, 130.00 , 169.00 ,Food
+,7D purse medium,,, 50.00 , 180.00 ,Stationary
+,Waraping Papper,,, 50.00 ,60,Stationary
+,Clear Bag,,, 120.00 ,150,Stationary
+,File Bag,,, 100.00 ,150,Stationary
+,Design Zip Bag,,, 160.00 ,200,Stationary
+,ARTIST BRUSH SET 6 IN 1,,, 180.00 , 220.00 ,Other
+,Gift Bag,,, 140.00 ,170,Stationary
+,Nico Nico Drink 320ml,,, 400.00 ,500,Beverage
+,Mountain Dew 320ml,,, 350.00 ,450,Beverage
+,Pepsi 320ml,,, 350.00 ,450,Beverage
+,Batook Bubblegum,,, 40.00 , 50.00 ,Stationary
+,Milo biscuit 104g,,, 475.00 , 620.00 ,Food
+,M&M 45g,,, 350.00 , 450.00 ,Food
+,Skittles 38g,,, 375.00 , 490.00 ,Food
+,Cadbury 13.2g,,, 80.00 , 110.00 ,Food
+,Cadbury Lickables,,, 310.00 , 400.00 ,Food
+,Twister Mashmallow,,, 80.00 , 110.00 ,Food
+,Beyoglu Dubai Choco 35g,,, 150.00 , 200.00 ,Food
+,Chilli Powder 100g,,,120.00,150,Spices
+,Chilli Powder 50g,,,60.00,80,Spices
+,Chilli Flakes 100g,,,140.00,180,Spices
+,Chilli Flakes 50g,,,70.00,90,Spices
+,Curry Powder 100g,,,90.00,120,Spices
+,Curry Powder 50g,,,45.00,60,Spices
+,Black Curry Powder 100g,,,110.00,140,Spices
+,Black Curry Powder 50g,,,55.00,70,Spices
+,Roasted Chilli Powder 100g,,,160.00,210,Spices
+,Roasted Chilli Powder 50g,,,80.00,100,Spices
+,Meat Curry 100g,,,260.00,340,Spices
+,Meat Curry 50g,,,130.00,170,Spices
+,Black Pepper Corn 100g,,,260.00,340,Spices
+,Black Pepper Corn 50g,,,130.00,170,Spices
+,Garam Masala 100g,,,250.00,320,Spices
+,Garam Masala 50g,,,130.00,170,Spices
+,Biriyani Powder 20g,,,80.00,100,Spices
+,Turmeric Powder 100g,,,350.00,450,Spices
+,Turmeric Powder 50g,,,190.00,250,Spices
+,Turmeric Powder 25g,,,100.00,130,Spices
+,Pepper Powder 100g,,,280.00,360,Spices
+,Pepper Powder 50g,,,140.00,180,Spices
+,Pepper Powder 25g,,,70.00,90,Spices
+,Lifebuoy,,, 150.00 ,160,Spices
+,Dishwash Bar,,, 40.00 ,63,Sundry
+,Air Freshner,,, 280.00 ,360,Sundry
+,Hand Wash 300ml,,, 150.00 ,320,Sundry
+,Bubble Bar,,, 175.00 ,200,Stationary
+,Sunlight ,,, 150.00 ,150,Sundry
+,Harpick,,, 165.00 ,265,Stationary
+,Tenis Ball,,, 133.33 ,180,Sundry
+,Vanilla Essence,,, 190.00 ,215,Food
+,Baking Powder,,, 200.00 ,220,Food
+,Jelly,,, 200.00 ,230,Food
+,Tuna Canned Fish,,, 600.00 ,750,Food
+,Rose Essence,,, 200.00 ,215,Food
+,Mango Chutney,,, 350.00 ,390,Food
+,Red Coloring,,, 210.00 ,225,Food
+,Blue Coloring,,, 180.00 ,195,Food
+,Green Coloring,,, 180.00 ,195,Food
+,Comfert,,, 300.00 ,300,Sundry
+,Tooth Pick,,, 100.00 ,120,Sundry
+,Detol 100ml,,, 340.00 ,14,Sundry
+,Lysol 200ml,,, 250.00 ,250,Sundry
+,Plastic Cup,,, 4.00 ,15,Sundry
+,Kapru Pkt,,, 150.00 ,175,Sundry
+,Aloka Incense Sticks,,, 180.00 ,200,Sundry
+,Parampara Incense Sticks,,, 130.00 ,150,Sundry
+,Papper Serviet Pkt,,, 130.00 ,250,Sundry
+,Toilet Papper Rall,,, 130.00 ,200,Sundry
+,Pocket Tissue,,, 28.00 ,35,Sundry
+,Bhuddist Flag,,,,50,Sundry
+,Snack Bean Curd Spicy,,, -   ,150,Food
+,Fried Bean Curd,,, -   ,150,Food
+,Cow Stomack Snak,,,0,140,Food
+,Spicy Sticks ,,,0,150,Food
+,Veg Stir Fried Chicken,,, -   ,100,Food
+,Spicy Prince Spicy Strips,,,0,75,Food
+,Want Want Rice Strips,,,0,120,Food

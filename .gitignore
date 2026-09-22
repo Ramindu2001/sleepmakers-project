@@ -1,0 +1,25 @@
+vendor/
+
+# Local SQL dumps stay out of the repo, but the barcode module ships its
+# installer and schema from here - git cannot re-include a file whose
+# parent directory is excluded, so the directory itself is not ignored.
+db/*
+!db/barcode_module.sql
+!db/barcode_module_install.php
+!db/BARCODE_MODULE.md
+/*.sql
+
+.env
+.vscode/
+node_modules/
+*.log
+
+# pre-edit safety copies taken while working - git is the real history
+*.bak_barcode_*
+
+# Server secret that signs the remember-me cookies (Includes/remember_me.php).
+# Created on first use; every server has its own. Never commit it.
+Includes/remember_me_secret.php
+
+# Server database credentials read by Includes/config.php. Each server has its own.
+Includes/db_credentials.php
