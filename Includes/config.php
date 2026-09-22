@@ -13,8 +13,13 @@ class Dbh
     {
         if (self::$sharedPdo === null) {
             //a server keeps its own credentials in db_credentials.php (never committed);
-            //without that file the local XAMPP defaults above are used
+            //without that file the local XAMPP defaults above are used. From the command line
+            //CLOUDPOS_DB_CREDENTIALS may name another credentials file - the test suite uses it
+            //to run against its own database. Web requests never read it.
             $credentialsFile = __DIR__ . '/db_credentials.php';
+            if (PHP_SAPI === 'cli' && getenv('CLOUDPOS_DB_CREDENTIALS')) {
+                $credentialsFile = getenv('CLOUDPOS_DB_CREDENTIALS');
+            } //test or tool override
             if (is_file($credentialsFile)) {
                 $credentials = require $credentialsFile;
                 $this->host = $credentials['host'];

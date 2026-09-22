@@ -23,3 +23,7 @@ Includes/remember_me_secret.php
 
 # Server database credentials read by Includes/config.php. Each server has its own.
 Includes/db_credentials.php
+
+# PHPUnit (tools/get-phpunit.sh) and its cache
+tools/phpunit.phar
+.phpunit.cache/
