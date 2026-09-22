@@ -254,6 +254,33 @@ final class ShopAccessTest extends DatabaseTestCase
         $this->assertFalse($this->access->isSuperAdmin('1 OR 1=1'));
     }
 
+    // ---- hasFeatureRight -------------------------------------------------------------------
+
+    public function test_feature_rights_come_from_the_role_held_in_that_shop()
+    {
+        $alice = $this->createUser('alice', 'x', $this->cashier);
+        $this->assign($alice, $this->warehouse, $this->storeKeeper);
+        $this->assign($alice, $this->showroom, $this->cashier);
+        $this->grant($this->storeKeeper, 2, ['is_edit']);
+        $this->grant($this->cashier, 2, ['is_view']);
+
+        $this->assertTrue($this->access->hasFeatureRight($alice, $this->warehouse, 2, ['is_create', 'is_edit']));
+        $this->assertFalse($this->access->hasFeatureRight($alice, $this->showroom, 2, ['is_create', 'is_edit']));
+        $this->assertFalse($this->access->hasFeatureRight($alice, $this->warehouse, 4, ['is_edit']));
+        $this->assertFalse($this->access->hasFeatureRight($alice, $this->warehouse, 2, ['is_edit = 1 OR 1']));
+    }
+
+    public function test_a_super_admin_has_every_right_and_a_revoked_user_none()
+    {
+        $admin = $this->admin();
+        $bob = $this->createUser('bob', 'x', $this->storeKeeper);
+        $this->assign($bob, $this->warehouse, $this->storeKeeper, false);
+        $this->grant($this->storeKeeper, 2, ['is_edit']);
+
+        $this->assertTrue($this->access->hasFeatureRight($admin, $this->showroom, 4, ['is_edit']));
+        $this->assertFalse($this->access->hasFeatureRight($bob, $this->warehouse, 2, ['is_edit']));
+    }
+
     public function test_unavailable_reason_follows_company_state()
     {
         $open = ['ComStat' => 1, 'ComExpireDate' => date('Y-m-d')];

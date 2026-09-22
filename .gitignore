@@ -11,6 +11,10 @@ db/*
 !db/shop_access_install.php
 !db/shop_access_module.sql
 !db/SHOP_ACCESS_MODULE.md
+!db/scan_upload_migration.php
+!db/scan_upload_install.php
+!db/scan_upload.sql
+!db/SCAN_UPLOAD_MODULE.md
 /*.sql
 
 .env

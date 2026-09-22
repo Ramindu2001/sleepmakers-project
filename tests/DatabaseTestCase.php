@@ -12,13 +12,14 @@ class TestDbh extends Dbh
 }//TestDbh
 
 //Base class for tests that need the database. Before every test all tables of the test
-//database are dropped and tests/fixtures/legacy_schema.sql is loaded, so each test starts
-//from the same known state.
+//database are dropped and tests/fixtures/legacy_schema.sql and stock_schema.sql are loaded,
+//so each test starts from the same known state.
 abstract class DatabaseTestCase extends TestCase
 {
     protected PDO $pdo;
 
-    //run the shop access migration after loading the legacy schema (its own tests turn it off)
+    //run the shop access and scanner upload migrations after loading the schema (the
+    //migrations' own tests turn it off)
     protected $migrate = true;
 
     protected function setUp(): void
@@ -28,6 +29,7 @@ abstract class DatabaseTestCase extends TestCase
         $this->resetSchema();
         if ($this->migrate) {
             (new ShopAccessMigration($this->pdo))->run();
+            (new ScanUploadMigration($this->pdo))->run();
         }//migrated schema
     }//setUp
 
@@ -37,12 +39,15 @@ abstract class DatabaseTestCase extends TestCase
         foreach ($this->pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN) as $table) {
             $this->pdo->exec('DROP TABLE `' . $table . '`');
         }//each table
-        $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
 
-        $sql = preg_replace('/^--.*$/m', '', file_get_contents(__DIR__ . '/fixtures/legacy_schema.sql'));
-        foreach (array_filter(array_map('trim', explode(';', $sql))) as $statement) {
-            $this->pdo->exec($statement);
-        }//each statement
+        //tables may name tables created after them (as in a mysqldump); the keys apply from here on
+        foreach (['legacy_schema.sql', 'stock_schema.sql'] as $file) {
+            $sql = preg_replace('/^--.*$/m', '', file_get_contents(__DIR__ . '/fixtures/' . $file));
+            foreach (array_filter(array_map('trim', explode(';', $sql))) as $statement) {
+                $this->pdo->exec($statement);
+            }//each statement
+        }//each schema file
+        $this->pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
     }//resetSchema
 
     //insert one row and return its auto increment id
@@ -121,4 +126,57 @@ abstract class DatabaseTestCase extends TestCase
             'is_active' => $active ? 1 : 0,
         ]);
     }//assign
+
+    protected function createProduct($shop_id, $barcode, $name, array $overrides = [])
+    {
+        return $this->insert('products', $overrides + [
+            'Barcode' => $barcode,
+            'ItemName' => $name,
+            'ProdPurchasePrice' => 100,
+            'ProdSellPrice' => 150,
+            'ProductStat' => 1,
+            'ItemType' => 'P',
+            'user_USID' => 1,
+            'Subcategories_SCID' => 1,
+            'shop_SHID' => $shop_id,
+            'PurchaseUnit' => 1,
+            'UnitConversion' => 1,
+            'SellingUnit' => 1,
+            'prodFlatDiscount' => 0,
+        ]);
+    }//createProduct
+
+    protected function createGrn($shop_id, $user_id, $stat = 0)
+    {
+        return $this->insert('grnheader', [
+            'GRNHeaderNo' => 'GRN_TEST', 'EffectiveDate' => date('Y-m-d'), 'InvoiceNo' => 'INV', 'ItemCount' => 0,
+            'TotalPurchasePrice' => 0, 'TotalSellPrice' => 0, 'GRNStat' => $stat, 'user_USID' => $user_id,
+            'shop_SHID' => $shop_id, 'Suppliers_SPID' => 1, 'SuppPayment' => 0, 'SuppBalance' => 0,
+            'excessAmount' => 0, 'refference' => '',
+        ]);
+    }//createGrn
+
+    //a stock batch: an inventory row with its price history row; returns the inventory id
+    protected function addStock($product_id, $shop_id, $qty, $batch, $purchase, $selling, array $overrides = [])
+    {
+        $inventory_id = $this->insert('inventory', [
+            'CurrentQty' => $qty, 'BillQty' => 0, 'ReturnQty' => 0, 'TransferInQty' => 0, 'TransferOutQty' => 0,
+            'products_PDID' => $product_id, 'shop_SHID' => $shop_id, 'RackID' => 1, 'BatchID' => $batch,
+        ]);
+        $this->insert('pricehistory', $overrides + [
+            'ProductID' => $product_id, 'VariationID' => 0, 'EffectiveDate' => date('Y-m-d'),
+            'PurchasePrice' => $purchase, 'SellingPrice' => $selling, 'labelPrice' => $selling,
+            'MnfDate' => null, 'ExpDate' => null, 'BatchID' => $batch, 'Inventory_INID' => $inventory_id,
+        ]);
+        return $inventory_id;
+    }//addStock
+
+    protected function createTransfer($from_shop_id, $to_shop_id, $user_id, $stat = 0)
+    {
+        return $this->insert('transferheader', [
+            'TransferNo' => 'TR_TEST', 'EffectiveDate' => date('Y-m-d'), 'TransferFrom' => $from_shop_id,
+            'TransferTo' => $to_shop_id, 'TransferTotalCount' => 0, 'TransferTotalAmount' => 0,
+            'TransferStat' => $stat, 'shop_SHID' => $from_shop_id, 'user_USID' => $user_id,
+        ]);
+    }//createTransfer
 }//DatabaseTestCase

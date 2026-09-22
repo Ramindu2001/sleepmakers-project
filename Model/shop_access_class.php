@@ -66,6 +66,33 @@ class ShopAccess extends Dbh
         return $user !== null && (int)$user['UserType'] === 1;
     }//is super admin
 
+    //does the role this user holds in this shop grant one of these rights on a feature
+    //(rights: the userroleaccess flags is_create, is_edit, is_view, is_delete, is_verify,
+    //is_print)? A super admin has every right; a user who may not enter the shop has none
+    public function hasFeatureRight($user_id, $shop_id, $feature_id, array $rights)
+    {
+        $access = $this->findAccess($user_id, $shop_id);
+        if($access === null)
+        {
+            return false;
+        }//may not enter the shop
+        if((int)$access['UserType'] === 1)
+        {
+            return true;
+        }//super admin
+
+        $flags = array_values(array_intersect($rights, ['is_create', 'is_edit', 'is_view', 'is_delete', 'is_verify', 'is_print']));
+        if(empty($flags))
+        {
+            return false;
+        }//no known right asked for
+
+        $stmt = $this->connect()->prepare("SELECT COUNT(*) FROM userroleaccess
+            WHERE UserRolls_URID = ? AND SysFeatures_SFID = ? AND (" . implode(' = 1 OR ', $flags) . " = 1);");
+        $stmt->execute([$access['UserRoles_URID'], (int)$feature_id]);
+        return (int)$stmt->fetchColumn() > 0;
+    }//has feature right
+
     //may this user enter this shop?
     public function canAccessShop($user_id, $shop_id)
     {
