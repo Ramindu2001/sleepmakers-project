@@ -24,4 +24,6 @@ require_once __DIR__ . '/../Model/DB_Class.php';
 require_once __DIR__ . '/../Model/user_class.php';
 require_once __DIR__ . '/../Model/shop_access_class.php';
 require_once __DIR__ . '/../db/shop_access_migration.php';
+require_once __DIR__ . '/../Includes/csrf.php';
+require_once __DIR__ . '/../Includes/shop_session.php';
 require_once __DIR__ . '/DatabaseTestCase.php';
