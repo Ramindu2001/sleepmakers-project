@@ -144,6 +144,213 @@ class CustomerOrders extends Dbh
         });
     }//update
 
+    public function cancel($id, $shop_id, $user_id)
+    {
+        $this->transaction(function() use ($id, $shop_id, $user_id) {
+            $order = $this->lock($id, $shop_id);
+            $this->requireSide($order, $shop_id, 'ours');
+            $this->requireRight($user_id, $shop_id, self::CHANGE, 'change customer orders');
+            $this->requireOpen($order);
+            if($this->progress($order)['moving'])
+            {
+                throw new CustomerOrderRefused(409, 'Items are already on the way. Ask the supplier to cancel the transfer first.');
+            }
+            $this->close($id, self::CANCELLED, $user_id);
+        });
+    }//cancel
+
+    //the customer took everything: the showroom closes the order (billing is done in POS)
+    public function handover($id, $shop_id, $user_id, $invoice_no)
+    {
+        $invoice_no = trim((string)$invoice_no);
+        if(strlen($invoice_no) > 60)
+        {
+            throw new CustomerOrderRefused(422, 'The invoice number is too long.');
+        }
+        $this->transaction(function() use ($id, $shop_id, $user_id, $invoice_no) {
+            $order = $this->lock($id, $shop_id);
+            $this->requireSide($order, $shop_id, 'ours');
+            $this->requireRight($user_id, $shop_id, self::CHANGE, 'change customer orders');
+            if(self::statusOf($order, $this->progress($order)) !== 'Arrived')
+            {
+                throw new CustomerOrderRefused(409, 'The order has not fully arrived yet.');
+            }
+            $this->connect()->prepare("UPDATE customerorders SET HandoverInvoiceNo = ? WHERE COID = ?;")
+                ->execute([$invoice_no === '' ? null : $invoice_no, (int)$id]);
+            $this->close($id, self::HANDED_OVER, $user_id);
+        });
+    }//handover
+
+    //---- the supplier ----------------------------------------------------------------------------
+
+    public function accept($id, $shop_id, $user_id)
+    {
+        $this->transaction(function() use ($id, $shop_id, $user_id) {
+            $order = $this->lock($id, $shop_id);
+            $this->requireSide($order, $shop_id, 'incoming');
+            $this->requireRight($user_id, $shop_id, self::PROCESS, 'process customer orders');
+            if((int)$order['OrderStat'] !== self::REQUESTED)
+            {
+                throw new CustomerOrderRefused(409, 'This order is no longer waiting for an answer.');
+            }
+            $this->decide($id, self::ACCEPTED, $user_id);
+        });
+    }//accept
+
+    public function reject($id, $shop_id, $user_id, $reason)
+    {
+        $reason = trim((string)$reason);
+        if($reason === '' || strlen($reason) > 255)
+        {
+            throw new CustomerOrderRefused(422, 'Enter the reason for rejecting the order.');
+        }
+        $this->transaction(function() use ($id, $shop_id, $user_id, $reason) {
+            $order = $this->lock($id, $shop_id);
+            $this->requireSide($order, $shop_id, 'incoming');
+            $this->requireRight($user_id, $shop_id, self::PROCESS, 'process customer orders');
+            $this->requireOpen($order);
+            if($this->progress($order)['moving'])
+            {
+                throw new CustomerOrderRefused(409, 'Items are already on the way. Cancel the transfer first.');
+            }
+            $this->decide($id, self::REJECTED, $user_id, $reason);
+        });
+    }//reject
+
+    //a transfer on hold, from this shop to the showroom, for what the order still needs of its
+    //catalog lines - taken from the batches oldest first, less what this shop's other open
+    //transfers already take. What the stock cannot cover is left for a later transfer
+    public function createTransfer($id, $shop_id, $user_id)
+    {
+        return $this->transaction(function() use ($id, $shop_id, $user_id) {
+            $order = $this->lock($id, $shop_id);
+            $this->requireSide($order, $shop_id, 'incoming');
+            $this->requireRight($user_id, $shop_id, self::PROCESS, 'process customer orders');
+            $this->requireOpen($order);
+            $progress = $this->progress($order);
+
+            $needed = [];
+            $names = [];
+            $custom = false;
+            foreach($progress['lines'] as $line)
+            {
+                if($line['LineSource'] !== 'WAREHOUSE')
+                {
+                    continue;
+                }//given from the showroom's stock: never sent
+                if($line['products_PDID'] === null)
+                {
+                    $custom = $custom || $line['arrived'] < $line['qty'];
+                    continue;
+                }//custom-made: marked sent by hand
+                $pdid = $line['products_PDID'];
+                $needed[$pdid] = (isset($needed[$pdid]) ? $needed[$pdid] : 0) + max(0, $line['qty'] - $line['on_transfer']);
+                $names[$pdid] = $line['Description'];
+            }
+            $needed = array_filter($needed, function($qty) { return $qty > 0; });
+            if(empty($needed))
+            {
+                throw new CustomerOrderRefused(409, 'Everything on this order is already on a transfer.');
+            }
+
+            //stock already taken by this shop's other open transfers is not offered twice
+            $stmt = $this->connect()->prepare("SELECT td.InventoryID, SUM(td.TransferQty) AS Qty FROM transferdetails td
+                INNER JOIN transferheader th ON th.THID = td.TransferHeader_THID
+                WHERE th.TransferFrom = ? AND th.TransferStat IN (0, 1) GROUP BY td.InventoryID;");
+            $stmt->execute([(int)$shop_id]);
+            $taken = [];
+            foreach($stmt->fetchAll(PDO::FETCH_ASSOC) as $row)
+            {
+                $taken[(int)$row['InventoryID']] = ['tdid' => null, 'qty' => (float)$row['Qty']];
+            }
+
+            $parts = [];
+            $short = [];
+            $total = 0;
+            foreach($needed as $pdid => $qty)
+            {
+                $allocation = $this->allocator->allocate($pdid, $shop_id, $qty, $taken);
+                foreach($allocation['parts'] as $part)
+                {
+                    $parts[] = ['product_id' => $pdid] + $part;
+                    $already = isset($taken[$part['inventory_id']]) ? $taken[$part['inventory_id']]['qty'] : 0;
+                    $taken[$part['inventory_id']] = ['tdid' => null, 'qty' => $already + $part['qty']];
+                    $total += $part['qty'];
+                }
+                if($allocation['short'] > 0)
+                {
+                    $short[] = $names[$pdid] . ' (' . self::qtyText($allocation['short']) . ')';
+                }
+            }//each product still needed
+            if(empty($parts))
+            {
+                throw new CustomerOrderRefused(422, 'Nothing left on this order is in stock at ' . $order['SupplierName'] . ' right now.');
+            }
+
+            $transfer_no = $this->nextTransferNo($shop_id);
+            $pdo = $this->connect();
+            $pdo->prepare("INSERT INTO transferheader (TransferNo, EffectiveDate, TransferFrom, TransferTo, TransferTotalCount, TransferTotalAmount,
+                TransferStat, shop_SHID, user_USID, CustomerOrderID) VALUES (?, ?, ?, ?, 0, 0, 0, ?, ?, ?);")
+                ->execute([$transfer_no, date('Y-m-d'), (int)$shop_id, (int)$order['shop_SHID'], (int)$shop_id, (int)$user_id, (int)$id]);
+            $transfer_id = (int)$pdo->lastInsertId();
+            $line = $pdo->prepare("INSERT INTO transferdetails (TransferQty, ReceivedQty, UnitPurchasePrice, UnitSellingPrice, MnfDate, ExpDate,
+                TransferTotalAmount, InventoryID, products_PDID, VariationID, RackID, TransferStat, TransferHeader_THID, Batch_ID)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?);");
+            foreach($parts as $part)
+            {
+                $line->execute([$part['qty'], $part['qty'], $part['purchase'], $part['selling'], $part['mnf'], $part['exp'],
+                    round($part['qty'] * (float)$part['purchase'], 2), $part['inventory_id'], $part['product_id'],
+                    $part['variation_id'], $transfer_id, $part['batch_id']]);
+            }//the lines manual entry would add, one per batch
+            if((int)$order['OrderStat'] === self::REQUESTED)
+            {
+                $this->decide($id, self::ACCEPTED, $user_id);
+            }
+
+            return [
+                'transfer_id' => $transfer_id,
+                'transfer_no' => $transfer_no,
+                'message' => 'Transfer ' . $transfer_no . ' created with ' . self::qtyText($total) . ' item(s).'
+                    . (empty($short) ? '' : ' Not enough stock for: ' . implode(', ', $short) . '.')
+                    . ($custom ? ' Custom-made items are marked sent on the order.' : ''),
+            ];
+        });
+    }//create transfer
+
+    public function markCustomSent($id, $shop_id, $user_id, $line_id, $qty, $note)
+    {
+        $this->transaction(function() use ($id, $shop_id, $user_id, $line_id, $qty, $note) {
+            $order = $this->lock($id, $shop_id);
+            $this->requireSide($order, $shop_id, 'incoming');
+            $this->requireRight($user_id, $shop_id, self::PROCESS, 'process customer orders');
+            $this->requireOpen($order);
+            $stmt = $this->connect()->prepare("SELECT COLID, Qty FROM customerorderlines WHERE COLID = ? AND customerorders_COID = ?
+                AND LineSource = 'WAREHOUSE' AND products_PDID IS NULL;");
+            $stmt->execute([(int)$line_id, (int)$id]);
+            $line = $stmt->fetch(PDO::FETCH_ASSOC);
+            if($line === false)
+            {
+                throw new CustomerOrderRefused(404, 'That line is not a custom-made item of this order.');
+            }
+            $sent = self::quantity($qty, true);
+            if($sent === null || $sent > (float)$line['Qty'])
+            {
+                throw new CustomerOrderRefused(422, 'Enter a quantity from 0 to ' . self::qtyText($line['Qty']) . '.');
+            }
+            $note = trim((string)$note);
+            if(strlen($note) > 255)
+            {
+                throw new CustomerOrderRefused(422, 'The note is too long.');
+            }
+            $this->connect()->prepare("UPDATE customerorderlines SET CustomSent = ?, CustomNote = ? WHERE COLID = ?;")
+                ->execute([$sent, $note === '' ? null : $note, (int)$line_id]);
+            if((int)$order['OrderStat'] === self::REQUESTED)
+            {
+                $this->decide($id, self::ACCEPTED, $user_id);
+            }
+        });
+    }//mark custom sent
+
     //---- reading -------------------------------------------------------------------------------
 
     public function get($id, $shop_id, $user_id)
@@ -453,6 +660,34 @@ class CustomerOrders extends Dbh
             throw new CustomerOrderRefused(403, 'You do not have the right to ' . $what . ' in this shop.');
         }
     }//require right
+
+    private function requireOpen(array $order)
+    {
+        if(!in_array((int)$order['OrderStat'], [self::REQUESTED, self::ACCEPTED], true))
+        {
+            throw new CustomerOrderRefused(409, 'This order is already closed.');
+        }
+    }//require open
+
+    private function decide($id, $stat, $user_id, $reason = null)
+    {
+        $this->connect()->prepare("UPDATE customerorders SET OrderStat = ?, RejectReason = ?, DecidedBy = ?, DecidedAt = ? WHERE COID = ?;")
+            ->execute([$stat, $reason, (int)$user_id, date('Y-m-d H:i:s'), (int)$id]);
+    }//decide
+
+    private function close($id, $stat, $user_id)
+    {
+        $this->connect()->prepare("UPDATE customerorders SET OrderStat = ?, ClosedBy = ?, ClosedAt = ? WHERE COID = ?;")
+            ->execute([$stat, (int)$user_id, date('Y-m-d H:i:s'), (int)$id]);
+    }//close
+
+    //the transfer number the Transfer page would give (Controller/transferController.php)
+    private function nextTransferNo($shop_id)
+    {
+        $stmt = $this->connect()->prepare("SELECT MAX(THID) FROM transferheader WHERE shop_SHID = ?;");
+        $stmt->execute([(int)$shop_id]);
+        return 'GT_' . str_pad((string)((int)$stmt->fetchColumn() + 1), 6, '0', STR_PAD_LEFT);
+    }//next transfer no
 
     private function nextOrderNo($shop_id)
     {

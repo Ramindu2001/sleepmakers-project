@@ -142,6 +142,163 @@ final class CustomerOrdersTest extends DatabaseTestCase
         $this->refused(function () use ($placed) { $this->orders->update($placed['id'], $this->warehouse, $this->alice, $this->data()); }, 422);
     }
 
+    // ---- the supplier's part and the hand-over ------------------------------------------------
+
+    private function transferLines($transfer)
+    {
+        $stmt = $this->pdo->prepare('SELECT InventoryID, products_PDID, TransferQty, ReceivedQty, UnitPurchasePrice, Batch_ID FROM transferdetails
+            WHERE TransferHeader_THID = ? ORDER BY TDID');
+        $stmt->execute([$transfer]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    //what the transfer Verify leaves for the order to read: the transfer verified, with these
+    //received quantities (line by line) when given
+    private function verify($transfer, ?array $received = null)
+    {
+        foreach ($this->transferLines($transfer) as $i => $line) {
+            if ($received !== null) {
+                $this->pdo->prepare('UPDATE transferdetails SET ReceivedQty = ? WHERE TransferHeader_THID = ? AND InventoryID = ?')
+                    ->execute([$received[$i], $transfer, $line['InventoryID']]);
+            }
+        }
+        $this->pdo->prepare('UPDATE transferheader SET TransferStat = 2 WHERE THID = ?')->execute([$transfer]);
+    }
+
+    public function test_the_supplier_accepts_or_rejects_with_a_reason()
+    {
+        $one = $this->orders->create($this->showroom, $this->bob, $this->data())['id'];
+        $two = $this->orders->create($this->showroom, $this->bob, $this->data())['id'];
+
+        $this->orders->accept($one, $this->warehouse, $this->alice);
+        $this->assertSame('Accepted', $this->orders->get($one, $this->warehouse, $this->alice)['status']);
+        $this->refused(function () use ($one) { $this->orders->accept($one, $this->warehouse, $this->alice); }, 409);
+        $this->refused(function () use ($one) { $this->orders->update($one, $this->showroom, $this->bob, $this->data()); }, 409);
+
+        $this->refused(function () use ($two) { $this->orders->reject($two, $this->warehouse, $this->alice, ' '); }, 422, 'Enter the reason for rejecting the order.');
+        $this->orders->reject($two, $this->warehouse, $this->alice, 'Discontinued model');
+        $order = $this->orders->get($two, $this->showroom, $this->bob);
+        $this->assertSame(['Rejected', 'Discontinued model', 'alice'], [$order['status'], $order['RejectReason'], $order['DecidedByName']]);
+    }
+
+    public function test_each_side_only_does_its_own_part()
+    {
+        $id = $this->orders->create($this->showroom, $this->bob, $this->data())['id'];
+        $this->refused(function () use ($id) { $this->orders->accept($id, $this->showroom, $this->bob); }, 404, 'This order was not sent to this shop.');
+        $this->refused(function () use ($id) { $this->orders->cancel($id, $this->warehouse, $this->alice); }, 404, 'This order was not placed by this shop.');
+        $this->refused(function () use ($id) { $this->orders->createTransfer($id, $this->showroom, $this->bob); }, 404);
+    }
+
+    public function test_the_transfer_carries_only_the_warehouse_catalog_lines_oldest_batches_first()
+    {
+        $id = $this->orders->create($this->showroom, $this->bob, $this->data([], [
+            ['source' => 'GIVEN', 'product_id' => $this->sheet, 'qty' => '1', 'invoice_no' => 'INV-10'],
+            ['source' => 'WAREHOUSE', 'product_id' => $this->bed, 'qty' => '7'],
+            ['source' => 'WAREHOUSE', 'product_id' => '', 'description' => 'Headboard', 'qty' => '1']]))['id'];
+
+        $made = $this->orders->createTransfer($id, $this->warehouse, $this->alice);
+
+        $header = $this->pdo->query("SELECT TransferNo, TransferFrom, TransferTo, TransferStat, shop_SHID, user_USID, CustomerOrderID FROM transferheader
+            WHERE THID = {$made['transfer_id']}")->fetch(PDO::FETCH_ASSOC);
+        $this->assertSame(['TransferNo' => 'GT_000001', 'TransferFrom' => $this->warehouse, 'TransferTo' => $this->showroom, 'TransferStat' => 0,
+            'shop_SHID' => $this->warehouse, 'user_USID' => $this->alice, 'CustomerOrderID' => $id], $header);
+        $this->assertSame([
+            ['InventoryID' => $this->bed1, 'products_PDID' => $this->bed, 'TransferQty' => '5.000', 'ReceivedQty' => '5.000', 'UnitPurchasePrice' => '900.00', 'Batch_ID' => 'B1'],
+            ['InventoryID' => $this->bed2, 'products_PDID' => $this->bed, 'TransferQty' => '2.000', 'ReceivedQty' => '2.000', 'UnitPurchasePrice' => '950.00', 'Batch_ID' => 'B2'],
+        ], $this->transferLines($made['transfer_id']));
+        $this->assertSame('Transfer GT_000001 created with 7 item(s). Custom-made items are marked sent on the order.', $made['message']);
+
+        $order = $this->orders->get($id, $this->warehouse, $this->alice);
+        $this->assertSame(['In transit', 7, 0], [$order['status'], $order['lines'][1]['on_transfer'], $order['lines'][1]['arrived']]);
+        $this->assertSame([['TransferNo' => 'GT_000001', 'status' => 'On hold']],
+            array_map(function ($t) { return ['TransferNo' => $t['TransferNo'], 'status' => $t['status']]; }, $order['transfers']));
+    }
+
+    public function test_what_the_stock_cannot_cover_is_reported_and_sent_later()
+    {
+        $id = $this->orders->create($this->showroom, $this->bob, $this->data([], [['source' => 'WAREHOUSE', 'product_id' => $this->bed, 'qty' => '12']]))['id'];
+        $first = $this->orders->createTransfer($id, $this->warehouse, $this->alice);
+        $this->assertSame('Transfer GT_000001 created with 10 item(s). Not enough stock for: Bed (2).', $first['message']);
+
+        $this->refused(function () use ($id) { $this->orders->createTransfer($id, $this->warehouse, $this->alice); }, 422,
+            'Nothing left on this order is in stock at Warehouse right now.');
+        $this->addStock($this->bed, $this->warehouse, 5, 'B3', 990, 1490);
+        $second = $this->orders->createTransfer($id, $this->warehouse, $this->alice);
+        $this->assertSame(['2.000'], array_column($this->transferLines($second['transfer_id']), 'TransferQty'));
+        $this->refused(function () use ($id) { $this->orders->createTransfer($id, $this->warehouse, $this->alice); }, 409,
+            'Everything on this order is already on a transfer.');
+    }
+
+    public function test_stock_on_other_open_transfers_is_not_offered_twice()
+    {
+        $other = $this->createTransfer($this->warehouse, $this->showroom, $this->alice);
+        $this->insert('transferdetails', ['TransferQty' => 8, 'ReceivedQty' => 8, 'UnitPurchasePrice' => 900, 'UnitSellingPrice' => 1400,
+            'TransferTotalAmount' => 7200, 'InventoryID' => $this->bed1, 'products_PDID' => $this->bed, 'VariationID' => 0, 'RackID' => 1,
+            'TransferStat' => 0, 'TransferHeader_THID' => $other, 'Batch_ID' => 'B1']);
+        $id = $this->orders->create($this->showroom, $this->bob, $this->data([], [['source' => 'WAREHOUSE', 'product_id' => $this->bed, 'qty' => '5']]))['id'];
+
+        $made = $this->orders->createTransfer($id, $this->warehouse, $this->alice);
+        $this->assertSame([[$this->bed2, '5.000']], array_map(function ($l) { return [$l['InventoryID'], $l['TransferQty']]; }, $this->transferLines($made['transfer_id'])));
+        $this->assertSame('Transfer GT_000002 created with 5 item(s).', $made['message']);
+    }
+
+    public function test_progress_follows_the_transfers_up_to_arrived()
+    {
+        $id = $this->orders->create($this->showroom, $this->bob, $this->data())['id'];
+        $made = $this->orders->createTransfer($id, $this->warehouse, $this->alice);
+        $this->verify($made['transfer_id'], [1]);
+        $order = $this->orders->get($id, $this->showroom, $this->bob);
+        $this->assertSame(['In transit', 2, 1, false], [$order['status'], $order['lines'][1]['on_transfer'], $order['lines'][1]['arrived'], $order['can_handover']]);
+
+        $this->pdo->exec("UPDATE transferdetails SET ReceivedQty = 2");
+        $order = $this->orders->get($id, $this->showroom, $this->bob);
+        $this->assertSame(['Arrived', 2, true], [$order['status'], $order['lines'][1]['arrived'], $order['can_handover']]);
+    }
+
+    public function test_a_cancelled_transfer_no_longer_counts()
+    {
+        $id = $this->orders->create($this->showroom, $this->bob, $this->data())['id'];
+        $made = $this->orders->createTransfer($id, $this->warehouse, $this->alice);
+        $this->refused(function () use ($id) { $this->orders->cancel($id, $this->showroom, $this->bob); }, 409,
+            'Items are already on the way. Ask the supplier to cancel the transfer first.');
+
+        $this->pdo->exec("UPDATE transferheader SET TransferStat = 3 WHERE THID = {$made['transfer_id']}");
+        $this->assertSame('Accepted', $this->orders->get($id, $this->showroom, $this->bob)['status']);
+        $this->orders->cancel($id, $this->showroom, $this->bob);
+        $this->assertSame('Cancelled', $this->orders->get($id, $this->showroom, $this->bob)['status']);
+        $this->refused(function () use ($id) { $this->orders->accept($id, $this->warehouse, $this->alice); }, 409);
+    }
+
+    public function test_custom_made_lines_are_marked_sent_by_the_supplier()
+    {
+        $id = $this->orders->create($this->showroom, $this->bob, $this->data([], [
+            ['source' => 'WAREHOUSE', 'product_id' => '', 'description' => 'Headboard', 'qty' => '2']]))['id'];
+        $order = $this->orders->get($id, $this->warehouse, $this->alice);
+        $line = $order['lines'][0];
+        $this->assertSame([true, false], [$order['can_mark_custom'], $order['can_create_transfer']]);
+
+        $this->refused(function () use ($id, $line) { $this->orders->markCustomSent($id, $this->warehouse, $this->alice, $line['COLID'], '3', ''); }, 422,
+            'Enter a quantity from 0 to 2.');
+        $this->orders->markCustomSent($id, $this->warehouse, $this->alice, $line['COLID'], '1', 'Van 2');
+        $order = $this->orders->get($id, $this->showroom, $this->bob);
+        $this->assertSame(['In transit', 1, 'Van 2'], [$order['status'], $order['lines'][0]['arrived'], $order['lines'][0]['CustomNote']]);
+        $this->orders->markCustomSent($id, $this->warehouse, $this->alice, $line['COLID'], '2', 'Van 2');
+        $this->assertSame('Arrived', $this->orders->get($id, $this->showroom, $this->bob)['status']);
+    }
+
+    public function test_the_showroom_hands_it_over_only_when_everything_arrived()
+    {
+        $id = $this->orders->create($this->showroom, $this->bob, $this->data())['id'];
+        $this->refused(function () use ($id) { $this->orders->handover($id, $this->showroom, $this->bob, 'INV-11'); }, 409,
+            'The order has not fully arrived yet.');
+        $this->verify($this->orders->createTransfer($id, $this->warehouse, $this->alice)['transfer_id']);
+
+        $this->orders->handover($id, $this->showroom, $this->bob, 'INV-11');
+        $order = $this->orders->get($id, $this->showroom, $this->bob);
+        $this->assertSame(['Handed over', 'INV-11', 'bob'], [$order['status'], $order['HandoverInvoiceNo'], $order['ClosedByName']]);
+        $this->assertSame(0, $this->orders->incomingCount($this->warehouse));
+    }
+
     public function test_suppliers_are_the_other_active_shops_of_the_company_and_their_catalog_shows_stock()
     {
         $company = (int)$this->pdo->query("SELECT Company_CMID FROM shop WHERE SHID = {$this->showroom}")->fetchColumn();
