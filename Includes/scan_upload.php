@@ -6,4 +6,5 @@ require_once __DIR__ . '/../Model/scan_refused_class.php';
 require_once __DIR__ . '/../Model/scan_batch_class.php';
 require_once __DIR__ . '/../Model/scan_document_class.php';
 require_once __DIR__ . '/../Model/scan_grn_class.php';
+require_once __DIR__ . '/../Model/stock_allocator_class.php';
 require_once __DIR__ . '/../Model/scan_transfer_class.php';

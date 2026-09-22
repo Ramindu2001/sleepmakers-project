@@ -8,6 +8,14 @@ class TransferScan extends ScanDocument
     const SEND_RIGHTS = ['is_edit'];
     const RECEIVE_RIGHTS = ['is_edit', 'is_verify'];
 
+    private $allocator;
+
+    public function __construct()
+    {
+        parent::__construct();
+        $this->allocator = new StockAllocator();
+    }//construct
+
     public function sendPreview($transfer_id, $shop_id, $user_id, $raw, array $decisions = [])
     {
         return $this->buildSend($this->header($transfer_id, $shop_id, $user_id, 'send', false), $raw, $decisions);
@@ -257,46 +265,11 @@ class TransferScan extends ScanDocument
     //the product's batches with stock, oldest first, less what this transfer already takes
     private function sendLine(array $product, $barcode, $qty, $shop_id, array $taken)
     {
-        $stmt = $this->connect()->prepare("SELECT inventory.INID, inventory.CurrentQty, pricehistory.BatchID, pricehistory.PurchasePrice,
-            pricehistory.SellingPrice, pricehistory.MnfDate, pricehistory.ExpDate, pricehistory.VariationID
-            FROM inventory
-            INNER JOIN pricehistory ON pricehistory.PHID = (SELECT MAX(ph.PHID) FROM pricehistory ph WHERE ph.Inventory_INID = inventory.INID)
-            WHERE inventory.products_PDID = ? AND inventory.shop_SHID = ? AND inventory.CurrentQty > 0
-            ORDER BY inventory.INID ASC;");
-        $stmt->execute([$product['PDID'], $shop_id]);
-
-        $free = 0;
-        $onTransfer = 0;
-        $remaining = $qty;
-        $parts = [];
-        foreach($stmt->fetchAll(PDO::FETCH_ASSOC) as $row)
-        {
-            $id = (int)$row['INID'];
-            $already = isset($taken[$id]) ? $taken[$id]['qty'] : 0;
-            $onTransfer += $already;
-            $left = (float)$row['CurrentQty'] - $already;
-            if($left <= 0)
-            {
-                continue;
-            }//this batch is already all on the transfer
-            $free += $left;
-            $use = min($left, $remaining);
-            if($use > 0)
-            {
-                $parts[] = [
-                    'inventory_id' => $id,
-                    'batch_id' => (string)$row['BatchID'],
-                    'qty' => self::number($use),
-                    'tdid' => isset($taken[$id]) ? $taken[$id]['tdid'] : null,
-                    'purchase' => $row['PurchasePrice'],
-                    'selling' => $row['SellingPrice'],
-                    'mnf' => self::validDate((string)$row['MnfDate']),
-                    'exp' => self::validDate((string)$row['ExpDate']),
-                    'variation_id' => empty($row['VariationID']) ? 0 : (int)$row['VariationID'],
-                ];
-                $remaining -= $use;
-            }
-        }//each batch, oldest first
+        $allocation = $this->allocator->allocate($product['PDID'], $shop_id, $qty, $taken);
+        $parts = $allocation['parts'];
+        $free = $allocation['free'];
+        $onTransfer = $allocation['taken'];
+        $remaining = $allocation['short'];
 
         $line = [
             'key' => $barcode, 'barcode' => $barcode, 'product_id' => (int)$product['PDID'], 'name' => $product['ItemName'],
