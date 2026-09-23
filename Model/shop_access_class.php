@@ -87,9 +87,11 @@ class ShopAccess extends Dbh
             return false;
         }//no known right asked for
 
+        //the role is ticked once per shop, so the ticks read are this shop's own
         $stmt = $this->connect()->prepare("SELECT COUNT(*) FROM userroleaccess
-            WHERE UserRolls_URID = ? AND SysFeatures_SFID = ? AND (" . implode(' = 1 OR ', $flags) . " = 1);");
-        $stmt->execute([$access['UserRoles_URID'], (int)$feature_id]);
+            WHERE UserRolls_URID = ? AND shop_SHID = ? AND SysFeatures_SFID = ?
+            AND (" . implode(' = 1 OR ', $flags) . " = 1);");
+        $stmt->execute([$access['UserRoles_URID'], (int)$shop_id, (int)$feature_id]);
         return (int)$stmt->fetchColumn() > 0;
     }//has feature right
 

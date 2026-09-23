@@ -966,9 +966,10 @@ if (!function_exists('bcGetLabelSizes')) {
             return true; //administrator
         }//admin
 
-        //rights come from the role held in the current shop (Model/shop_access_class.php)
+        //rights come from the role held in the current shop (Model/shop_access_class.php),
+        //ticked for that shop (db/SHOP_PERMISSIONS_MODULE.md)
         require_once __DIR__ . '/../Model/shop_access_class.php';
-        $shop_id = isset($_SESSION['shop_id']) ? $_SESSION['shop_id'] : 0;
+        $shop_id = isset($_SESSION['shop_id']) ? (int) $_SESSION['shop_id'] : 0;
         $role_id = (int) (new ShopAccess())->getShopRoleId($user_id, $shop_id);
         if ($role_id === 0) {
             return false;
@@ -976,6 +977,7 @@ if (!function_exists('bcGetLabelSizes')) {
 
         $access = $dbObj->getData("SELECT " . $right . " FROM userroleaccess
                                    WHERE UserRolls_URID = " . $role_id . "
+                                     AND shop_SHID = " . $shop_id . "
                                      AND SysFeatures_SFID = " . (int) $feature_id . ";");
 
         if (empty($access)) {

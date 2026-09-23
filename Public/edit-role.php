@@ -17,7 +17,7 @@ super_admin_page(); //system admin only, decided before any of the page is sent
     header("Location:./user-roles.php");
   }
   $user_module=new UserRole();
-  $user_modules=$user_module->select_edit_rolemodules($_GET['id']);
+  $user_modules=$user_module->select_edit_rolemodules($_GET['id'],$shop_id);
   $edit_user=$user_module->edit_role($_GET['id']);
   if(count($edit_user)==0)
   {
@@ -162,7 +162,7 @@ super_admin_page(); //system admin only, decided before any of the page is sent
                                                         </thead>
                                                         <tbody>
                                                             <?php
-                                            $user_sysfeatures=$user_module->select_edit_rolefeatures($row_modules['SMID'],$_GET['id']);
+                                            $user_sysfeatures=$user_module->select_edit_rolefeatures($row_modules['SMID'],$_GET['id'],$shop_id);
                                             $i=1;
                                             foreach ($user_sysfeatures as $row_feature) 
                                             {

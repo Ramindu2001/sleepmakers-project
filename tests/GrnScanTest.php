@@ -16,7 +16,7 @@ final class GrnScanTest extends DatabaseTestCase
         $company = $this->createCompany();
         $this->shop = $this->createShop($company, ['ShopName' => 'Warehouse']);
         $this->keeper = $this->createRole('Store Keeper');
-        $this->grant($this->keeper, 2, ['is_edit']);
+        $this->grant($this->keeper, 2, ['is_edit'], $this->shop);
         $this->alice = $this->createUser('alice', 'x', $this->keeper);
         $this->assign($this->alice, $this->shop, $this->keeper);
         $this->bed = $this->createProduct($this->shop, 'COO00001', 'Bed', ['ProdPurchasePrice' => 1000, 'ProdSellPrice' => 1500]);
@@ -168,7 +168,7 @@ final class GrnScanTest extends DatabaseTestCase
             [$this->createGrn($this->createShop($this->createCompany()), $this->alice), $this->shop, $this->alice, 404],
         ];
         $viewer = $this->createRole('Viewer');
-        $this->grant($viewer, 2, ['is_view']);
+        $this->grant($viewer, 2, ['is_view'], $this->shop);
         $bob = $this->createUser('bob', 'x', $viewer);
         $this->assign($bob, $this->shop, $viewer);
         $cases[] = [$this->grn, $this->shop, $bob, 403];

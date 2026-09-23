@@ -31,6 +31,7 @@ abstract class DatabaseTestCase extends TestCase
             (new ShopAccessMigration($this->pdo))->run();
             (new ScanUploadMigration($this->pdo))->run();
             (new CustomerOrdersMigration($this->pdo))->run();
+            (new ShopPermissionsMigration($this->pdo))->run();
         }//migrated schema
     }//setUp
 
@@ -102,19 +103,22 @@ abstract class DatabaseTestCase extends TestCase
         ]);
     }//createUser
 
-    //give a role rights on a feature, e.g. grant($role, 1, ['is_view'])
-    protected function grant($role_id, $feature_id, array $rights)
+    //give a role rights on a feature IN ONE SHOP, e.g. grant($role, 1, ['is_view'], $shop)
+    protected function grant($role_id, $feature_id, array $rights, $shop_id)
     {
         $flags = ['is_create' => 0, 'is_edit' => 0, 'is_view' => 0, 'is_delete' => 0, 'is_verify' => 0, 'is_print' => 0];
         foreach ($rights as $right) {
             $flags[$right] = 1;
         }//each right
-        return $this->insert('userroleaccess', $flags + ['UserRolls_URID' => $role_id, 'SysFeatures_SFID' => $feature_id]);
+        return $this->insert('userroleaccess', $flags + ['UserRolls_URID' => $role_id,
+            'shop_SHID' => $shop_id, 'SysFeatures_SFID' => $feature_id]);
     }//grant
 
-    protected function allowModule($role_id, $module_id)
+    //show a menu module to a role IN ONE SHOP
+    protected function allowModule($role_id, $module_id, $shop_id)
     {
-        return $this->insert('usermoduleaccess', ['SysModules_SMID' => $module_id, 'UserRoles_URID' => $role_id]);
+        return $this->insert('usermoduleaccess', ['SysModules_SMID' => $module_id,
+            'UserRoles_URID' => $role_id, 'shop_SHID' => $shop_id]);
     }//allowModule
 
     //assign a user to a shop with a role (needs the migrated schema)

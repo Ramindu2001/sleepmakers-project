@@ -186,53 +186,68 @@ class User extends Dbh
         return $stmt->fetchAll();   
     }//get user by name
 
-    public function getUserRoleModuleAccess($userRole_id)
+    //Which shop's ticks to read. A role is ticked once per shop (db/SHOP_PERMISSIONS_MODULE.md),
+    //so every permission lookup below is about the shop the page is open in. The pages pass no
+    //shop of their own: it is the one entered at the shop sign in. No shop open means no rights.
+    private static function ticksOfShop($shop_id = null)
     {
-        $sql = "SELECT * FROM `usermoduleaccess` WHERE UserRoles_URID=?";
+        if($shop_id !== null)
+        {
+            return (int)$shop_id;
+        }//the caller knows which shop
+
+        return isset($_SESSION['shop_id']) ? (int)$_SESSION['shop_id'] : 0;
+    }//ticks of shop
+
+    public function getUserRoleModuleAccess($userRole_id, $shop_id = null)
+    {
+        $sql = "SELECT * FROM `usermoduleaccess` WHERE UserRoles_URID=? AND shop_SHID=?";
         $stmt = $this->connect()->prepare($sql);
-        $stmt->execute([$userRole_id]);
-        return $stmt->fetchAll();   
+        $stmt->execute([$userRole_id, self::ticksOfShop($shop_id)]);
+        return $stmt->fetchAll();
     }
 
-    public function userAcces($userRole_id,$feature_id)
+    public function userAcces($userRole_id,$feature_id, $shop_id = null)
     {
-        $sql = "SELECT * FROM `userroleaccess` WHERE UserRolls_URID=? AND SysFeatures_SFID=?";
+        $sql = "SELECT * FROM `userroleaccess` WHERE UserRolls_URID=? AND shop_SHID=? AND SysFeatures_SFID=?";
         $stmt = $this->connect()->prepare($sql);
-        $stmt->execute([$userRole_id,$feature_id]);
+        $stmt->execute([$userRole_id, self::ticksOfShop($shop_id), $feature_id]);
         $data=$stmt->fetchAll();
         return $data;
     }
 
-    public function getUserRoleFeatureAccess($userRole_id,$feature_id)
+    public function getUserRoleFeatureAccess($userRole_id,$feature_id, $shop_id = null)
     {
-        $sql = "SELECT * FROM `userroleaccess` WHERE UserRolls_URID=? AND SysFeatures_SFID=?";
+        $sql = "SELECT * FROM `userroleaccess` WHERE UserRolls_URID=? AND shop_SHID=? AND SysFeatures_SFID=?";
         $stmt = $this->connect()->prepare($sql);
-        $stmt->execute([$userRole_id,$feature_id]);
-        return $stmt->fetchAll();   
+        $stmt->execute([$userRole_id, self::ticksOfShop($shop_id), $feature_id]);
+        return $stmt->fetchAll();
     }
 
-    public function getRoleViewAccess($userRole_id,$feature_id)
+    public function getRoleViewAccess($userRole_id,$feature_id, $shop_id = null)
     {
-        $sql = "SELECT * FROM `userroleaccess` WHERE UserRolls_URID=? AND SysFeatures_SFID=?";
+        $sql = "SELECT * FROM `userroleaccess` WHERE UserRolls_URID=? AND shop_SHID=? AND SysFeatures_SFID=?";
         $stmt = $this->connect()->prepare($sql);
-        $stmt->execute([$userRole_id,$feature_id]);
-        $data = $stmt->fetchAll(); 
+        $stmt->execute([$userRole_id, self::ticksOfShop($shop_id), $feature_id]);
+        $data = $stmt->fetchAll();
         $access = empty($data[0]['is_view']) ? 0 : 1;
         return $access;
     }
 
-    //the user's rights on a feature in a shop - through the role they hold in that shop
+    //the user's rights on a feature in a shop - through the role they hold in that shop, as
+    //that role is ticked in that shop
     public function getUserFeatureAccess($user_id,$feature_id,$shop_id)
     {
         $sql = "SELECT RAID, is_create, is_edit, is_view, is_delete, is_verify, is_print, UserRolls_URID, SysFeatures_SFID FROM userroleaccess
         INNER JOIN userroles ON userroles.URID = userroleaccess.UserRolls_URID
         INNER JOIN shopusers ON shopusers.UserRoles_URID = userroleaccess.UserRolls_URID
+        AND shopusers.shop_SHID = userroleaccess.shop_SHID
         WHERE shopusers.user_USID = ? AND shopusers.shop_SHID = ? AND shopusers.is_active = 1
         AND userroles.ur_status = 1 AND SysFeatures_SFID = ?;";
         $stmt = $this->connect()->prepare($sql);
         $stmt->execute([$user_id,$shop_id,$feature_id]);
-        $data = $stmt->fetchAll(); 
-        
+        $data = $stmt->fetchAll();
+
         return $data;
     }
 

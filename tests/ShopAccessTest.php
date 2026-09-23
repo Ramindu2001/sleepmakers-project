@@ -261,8 +261,8 @@ final class ShopAccessTest extends DatabaseTestCase
         $alice = $this->createUser('alice', 'x', $this->cashier);
         $this->assign($alice, $this->warehouse, $this->storeKeeper);
         $this->assign($alice, $this->showroom, $this->cashier);
-        $this->grant($this->storeKeeper, 2, ['is_edit']);
-        $this->grant($this->cashier, 2, ['is_view']);
+        $this->grant($this->storeKeeper, 2, ['is_edit'], $this->warehouse);
+        $this->grant($this->cashier, 2, ['is_view'], $this->showroom);
 
         $this->assertTrue($this->access->hasFeatureRight($alice, $this->warehouse, 2, ['is_create', 'is_edit']));
         $this->assertFalse($this->access->hasFeatureRight($alice, $this->showroom, 2, ['is_create', 'is_edit']));
@@ -270,12 +270,23 @@ final class ShopAccessTest extends DatabaseTestCase
         $this->assertFalse($this->access->hasFeatureRight($alice, $this->warehouse, 2, ['is_edit = 1 OR 1']));
     }
 
+    public function test_the_same_role_is_ticked_separately_in_each_shop()
+    {
+        $bob = $this->createUser('bob', 'x', $this->storeKeeper);
+        $this->assign($bob, $this->warehouse, $this->storeKeeper);
+        $this->assign($bob, $this->showroom, $this->storeKeeper);
+        $this->grant($this->storeKeeper, 2, ['is_edit'], $this->warehouse);
+
+        $this->assertTrue($this->access->hasFeatureRight($bob, $this->warehouse, 2, ['is_edit']));
+        $this->assertFalse($this->access->hasFeatureRight($bob, $this->showroom, 2, ['is_edit']));
+    }
+
     public function test_a_super_admin_has_every_right_and_a_revoked_user_none()
     {
         $admin = $this->admin();
         $bob = $this->createUser('bob', 'x', $this->storeKeeper);
         $this->assign($bob, $this->warehouse, $this->storeKeeper, false);
-        $this->grant($this->storeKeeper, 2, ['is_edit']);
+        $this->grant($this->storeKeeper, 2, ['is_edit'], $this->warehouse);
 
         $this->assertTrue($this->access->hasFeatureRight($admin, $this->showroom, 4, ['is_edit']));
         $this->assertFalse($this->access->hasFeatureRight($bob, $this->warehouse, 2, ['is_edit']));

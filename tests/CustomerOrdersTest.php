@@ -20,9 +20,9 @@ final class CustomerOrdersTest extends DatabaseTestCase
         $this->showroom = $this->createShop($company, ['ShopName' => 'Valentino Italy']);
         $feature = $this->orders->featureId();
         $sales = $this->createRole('Sales');
-        $this->grant($sales, $feature, ['is_view', 'is_create', 'is_edit']);
+        $this->grant($sales, $feature, ['is_view', 'is_create', 'is_edit'], $this->showroom);
         $keeper = $this->createRole('Store Keeper');
-        $this->grant($keeper, $feature, ['is_view', 'is_verify']);
+        $this->grant($keeper, $feature, ['is_view', 'is_verify'], $this->warehouse);
         $this->bob = $this->createUser('bob', 'x', $sales);
         $this->assign($this->bob, $this->showroom, $sales);
         $this->alice = $this->createUser('alice', 'x', $keeper);
@@ -106,7 +106,7 @@ final class CustomerOrdersTest extends DatabaseTestCase
     public function test_only_a_role_with_the_right_places_orders()
     {
         $viewer = $this->createRole('Viewer');
-        $this->grant($viewer, $this->orders->featureId(), ['is_view']);
+        $this->grant($viewer, $this->orders->featureId(), ['is_view'], $this->showroom);
         $clerk = $this->createUser('carol', 'x', $viewer);
         $this->assign($clerk, $this->showroom, $viewer);
         $this->refused(function () use ($clerk) { $this->orders->create($this->showroom, $clerk, $this->data()); }, 403);

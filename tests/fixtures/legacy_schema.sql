@@ -135,6 +135,13 @@ CREATE TABLE `usermoduleaccess` (
   KEY `UserRoles_URID` (`UserRoles_URID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
 
+CREATE TABLE `sysmodules` (
+  `SMID` int(11) NOT NULL AUTO_INCREMENT,
+  `ModuleName` varchar(60) DEFAULT NULL,
+  `sort_order` int(11) NOT NULL DEFAULT 9999,
+  PRIMARY KEY (`SMID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
 CREATE TABLE `sysfeatures` (
   `SFID` int(11) NOT NULL AUTO_INCREMENT,
   `FeatureName` varchar(45) DEFAULT NULL,

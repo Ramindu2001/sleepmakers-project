@@ -21,7 +21,8 @@ final class TransferScanTest extends DatabaseTestCase
         $this->warehouse = $this->createShop($company, ['ShopName' => 'Warehouse']);
         $this->showroom = $this->createShop($company, ['ShopName' => 'Valentino Italy']);
         $keeper = $this->createRole('Store Keeper');
-        $this->grant($keeper, 4, ['is_edit']);
+        $this->grant($keeper, 4, ['is_edit'], $this->warehouse);
+        $this->grant($keeper, 4, ['is_edit'], $this->showroom);
         $this->alice = $this->createUser('alice', 'x', $keeper);
         $this->assign($this->alice, $this->warehouse, $keeper);
         $this->bob = $this->createUser('bob', 'x', $keeper);
@@ -211,7 +212,7 @@ final class TransferScanTest extends DatabaseTestCase
             $this->assertSame(404, $e->status);
         }
         $checker = $this->createRole('Checker');
-        $this->grant($checker, 4, ['is_verify']);
+        $this->grant($checker, 4, ['is_verify'], $this->showroom);
         $dave = $this->createUser('dave', 'x', $checker);
         $this->assign($dave, $this->showroom, $checker);
         $this->assertSame(7, $this->lines($this->scan->receivePreview($this->transfer, $this->showroom, $dave, 'COO00001'))['COO00001']['sent']);
@@ -220,7 +221,7 @@ final class TransferScanTest extends DatabaseTestCase
     public function test_send_is_refused_to_the_receiving_shop_closed_transfers_and_users_without_rights()
     {
         $viewer = $this->createRole('Viewer');
-        $this->grant($viewer, 4, ['is_view']);
+        $this->grant($viewer, 4, ['is_view'], $this->warehouse);
         $carol = $this->createUser('carol', 'x', $viewer);
         $this->assign($carol, $this->warehouse, $viewer);
         $closed = $this->createTransfer($this->warehouse, $this->showroom, $this->alice, 2);

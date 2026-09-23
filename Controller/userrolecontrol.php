@@ -13,6 +13,11 @@ if(!posted_csrf_valid())
     exit;
 }//stale or forged form
 
+//a role is ticked once per shop: everything saved below belongs to the shop this admin is
+//signed into and nothing else (db/SHOP_PERMISSIONS_MODULE.md). authcheck.php sends anyone
+//without a shop open back to the shop screen, so $shop_id is always a shop they may enter.
+$shop_id = (int)$shop_id;
+
 if (isset($_POST['add-role'])) 
 {
     if (!empty($_POST['role_name'])) 
@@ -39,7 +44,7 @@ if (isset($_POST['add-role']))
                 {
                     for ($mu=0; $mu < count($_POST['module_user'][$_POST['module_id'][$i]]) ; $mu++) 
                     { 
-                        $user_module=$role->add_role_module($role_id,$_POST['module_user'][$_POST['module_id'][$i]][$mu]);
+                        $user_module=$role->add_role_module($role_id,$_POST['module_user'][$_POST['module_id'][$i]][$mu],$shop_id);
                     }
                 }
                 
@@ -70,7 +75,7 @@ if (isset($_POST['add-role']))
                         echo $print . "<br>";
                         $userrole=$role_id;
                         $feature=$_POST['feature_id'][$_POST['module_id'][$i]][$j];
-                        $user_role_access=$role->add_userrole($create,$update,$view,$delete,$verify,$print,$userrole,$feature);
+                        $user_role_access=$role->add_userrole($create,$update,$view,$delete,$verify,$print,$userrole,$feature,$shop_id);
                     }
                 }
 
@@ -104,8 +109,8 @@ elseif (isset($_POST['edit-role']))
             }
             else
             {
-                $delete_modules=$role->delete_user_modules($role_id);
-                $delete_feature=$role->delete_user_feature($role_id);
+                $delete_modules=$role->delete_user_modules($role_id,$shop_id);
+                $delete_feature=$role->delete_user_feature($role_id,$shop_id);
                 $update_role_nm=$role->update_role_name($role_id,$role_name);
                 
                 for ($i = 0; $i < count($_POST['module_id']); $i++) 
@@ -115,7 +120,7 @@ elseif (isset($_POST['edit-role']))
                     {
                         for ($mu=0; $mu < count($_POST['module_user'][$_POST['module_id'][$i]]) ; $mu++) 
                         { 
-                            $user_module=$role->add_role_module($role_id,$_POST['module_user'][$_POST['module_id'][$i]][$mu]);
+                            $user_module=$role->add_role_module($role_id,$_POST['module_user'][$_POST['module_id'][$i]][$mu],$shop_id);
                         }
                     }
                     
@@ -146,7 +151,7 @@ elseif (isset($_POST['edit-role']))
                             echo $print . "<br>";
                             $userrole=$role_id;
                             $feature=$_POST['feature_id'][$_POST['module_id'][$i]][$j];
-                            $user_role_access=$role->add_userrole($create,$update,$view,$delete,$verify,$print,$userrole,$feature);
+                            $user_role_access=$role->add_userrole($create,$update,$view,$delete,$verify,$print,$userrole,$feature,$shop_id);
                         }
                     }
 

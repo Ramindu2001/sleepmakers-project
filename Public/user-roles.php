@@ -150,7 +150,7 @@ super_admin_page(); //system admin only, decided before any of the page is sent
                                           </td>
                                           <td>
                                               <?php  
-                                              $user_features=$ur->select_all_user_role_feature($key['URID']);
+                                              $user_features=$ur->select_all_user_role_feature($key['URID'],$shop_id);
                                               foreach ($user_features as $features) 
                                               {
                                                 ?>
@@ -166,7 +166,7 @@ super_admin_page(); //system admin only, decided before any of the page is sent
                                           </td>
                                           <td>
                                               <?php
-                                              $user_module=$ur->select_all_user_role_module($key['URID']);
+                                              $user_module=$ur->select_all_user_role_module($key['URID'],$shop_id);
                                               foreach ($user_module as $module) 
                                               {
                                                 ?>
