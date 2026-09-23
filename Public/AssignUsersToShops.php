@@ -37,11 +37,15 @@ super_admin_page(); //system admin only, decided before any of the page is sent
                 <?php include '../View/header.php'; ?>
                 <div class="container-fluid">
                     <h5 class="card-title fw-semibold mb-4">Assign Users to Shops</h5>
-                    <p class="mb-3">Each row lets one user into one shop, with the role they hold in that shop. Revoke blocks access but keeps the row and its history.</p>
+                    <p class="mb-3">Each row lets one user into one shop, with the role they hold in that shop. Revoke blocks access but keeps the row and its history.
+                        A user only ever sees the shops listed for them here, and what they may do in each one comes from
+                        that shop's own ticks (Settings &rarr; User Roles, inside that shop).</p>
 
                     <button type="button" class="btn btn-primary rounded-pill ml-1 mb-2"
                         id="btn_Add_SysFeature_modal">Add New Users</button>
                     <input type="hidden" id="assign_csrf_token" value="<?=htmlspecialchars(csrf_token())?>">
+                    <!-- new assignments start from the shop this admin is signed into (Assets/jquery/AddShops.js) -->
+                    <input type="hidden" id="assign_this_shop" value="<?=(int)$shop_id?>">
                     <br>
                     <div class="card">
                         <div class="card-body">

@@ -24,7 +24,9 @@ $(document).ready(function () {
     $('#btn_Add_SysFeature_modal').click(function () {
         $("#assign_modal_title").text("Add Users");
         $("#assign_suid").val('');
+        //the shop this admin is signed into: assignments are nearly always for the shop they are in
         $("#ShopName, #UserName").prop('disabled', false).val('');
+        $("#ShopName").val($("#assign_this_shop").val() || '');
         $("#RoleName").val('');
         showError('');
         modal.modal('show');

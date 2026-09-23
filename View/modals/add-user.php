@@ -66,7 +66,11 @@
                           }
                           ?>
                                 </select>
-                                <small class="text-muted">Rights in each shop are set under Settings &rarr; Assign Users to Shops.</small>
+                                <!-- the new user joins the shop they are created in (Controller/userController.php)
+                                     and what they may do there is that shop's own ticks -->
+                                <small class="text-muted">The new user joins <b><?=htmlspecialchars($shop_name)?></b> with this
+                                    role and is not in any other shop until you add them under Settings &rarr; Assign Users to
+                                    Shops. What the role may do is ticked per shop under Settings &rarr; User Roles.</small>
                             </div>
                             <?php 
                             if($userType==1)

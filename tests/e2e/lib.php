@@ -140,13 +140,14 @@ class E2EFixtures
         }
 
         //Store Keeper sees Store (module 1, feature 1); Cashier sees Invoice List (module 2, feature 56).
-        //Like roles made in Settings -> User Roles, each role has a row for every feature.
+        //Like roles made in Settings -> User Roles, each role has a row for every feature, in every
+        //shop it is used in: the ticks belong to one role IN ONE SHOP (db/SHOP_PERMISSIONS_MODULE.md).
         foreach (['keeper' => ['e2e Store Keeper', 1, 1, 1], 'cashier' => ['e2e Cashier', 1, 2, 56], 'retired' => ['e2e Retired', 0, 2, 56]] as $key => $role) {
             $this->pdo->prepare("INSERT INTO userroles (UserRoleName, ur_status, added_by) VALUES (?, ?, 1)")->execute([$role[0], $role[1]]);
             $this->roles[$key] = (int) $this->pdo->lastInsertId();
-            $this->pdo->prepare("INSERT INTO usermoduleaccess (SysModules_SMID, UserRoles_URID) VALUES (?, ?)")->execute([$role[2], $this->roles[$key]]);
-            $this->pdo->prepare("INSERT INTO userroleaccess (is_create, is_edit, is_view, is_delete, is_verify, is_print, UserRolls_URID, SysFeatures_SFID)
-                SELECT 0, 0, IF(SFID = ?, 1, 0), 0, 0, 0, ?, SFID FROM sysfeatures")->execute([$role[3], $this->roles[$key]]);
+            foreach ($this->shops as $shop_id) {
+                $this->tick($this->roles[$key], $shop_id, $role[2], $role[3]);
+            }//each shop
         }
 
         $hash = password_hash($this->password, PASSWORD_DEFAULT);
@@ -163,6 +164,44 @@ class E2EFixtures
         $this->assign('alice', 'S', 'cashier');
         $this->assign('bob', 'S', 'keeper');
         $this->assign('carol', 'W', 'retired');
+    }
+
+    //one role's ticks in one shop: the menu module it is shown, and view on one feature
+    public function tick($role_id, $shop_id, $module_id, $feature_id)
+    {
+        $this->pdo->prepare("INSERT INTO usermoduleaccess (SysModules_SMID, shop_SHID, UserRoles_URID) VALUES (?, ?, ?)")
+            ->execute([$module_id, $shop_id, $role_id]);
+        $this->pdo->prepare("INSERT INTO userroleaccess (is_create, is_edit, is_view, is_delete, is_verify, is_print, UserRolls_URID, shop_SHID, SysFeatures_SFID)
+            SELECT 0, 0, IF(SFID = ?, 1, 0), 0, 0, 0, ?, ?, SFID FROM sysfeatures")
+            ->execute([$feature_id, $role_id, $shop_id]);
+    }
+
+    //what a role is ticked for in a shop: [feature id => "cevdyp" flags], only the rows with a tick
+    public function ticksOf($role_id, $shop_id)
+    {
+        $stmt = $this->pdo->prepare("SELECT SysFeatures_SFID, is_create, is_edit, is_view, is_delete, is_verify, is_print
+            FROM userroleaccess WHERE UserRolls_URID = ? AND shop_SHID = ?
+            AND (is_create = 1 OR is_edit = 1 OR is_view = 1 OR is_delete = 1 OR is_verify = 1 OR is_print = 1)
+            ORDER BY SysFeatures_SFID");
+        $stmt->execute([$role_id, $shop_id]);
+        $ticks = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $flags = '';
+            foreach (['is_create' => 'c', 'is_edit' => 'e', 'is_view' => 'v', 'is_delete' => 'd', 'is_verify' => 'y', 'is_print' => 'p'] as $column => $letter) {
+                $flags .= $row[$column] == 1 ? $letter : '';
+            }//each right
+            $ticks[(int) $row['SysFeatures_SFID']] = $flags;
+        }//each feature
+        return $ticks;
+    }
+
+    //the menu modules a role is shown in a shop
+    public function modulesOf($role_id, $shop_id)
+    {
+        $stmt = $this->pdo->prepare("SELECT SysModules_SMID FROM usermoduleaccess
+            WHERE UserRoles_URID = ? AND shop_SHID = ? ORDER BY SysModules_SMID");
+        $stmt->execute([$role_id, $shop_id]);
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
     }
 
     public function assign($user, $shop, $role, $active = 1)
@@ -246,8 +285,9 @@ class E2EFixtures
         $shops = "SELECT SHID FROM shop WHERE ShopName LIKE 'e2e %'";
         $this->pdo->exec("DELETE FROM shopusers WHERE user_USID IN ($users) OR shop_SHID IN ($shops)");
         $this->pdo->exec("DELETE FROM userlog WHERE user_USID IN ($users)");
-        $this->pdo->exec("DELETE FROM userroleaccess WHERE UserRolls_URID IN ($roles)");
-        $this->pdo->exec("DELETE FROM usermoduleaccess WHERE UserRoles_URID IN ($roles)");
+        //ticks belong to a role in a shop, so both an e2e role and an e2e shop take theirs with them
+        $this->pdo->exec("DELETE FROM userroleaccess WHERE UserRolls_URID IN ($roles) OR shop_SHID IN ($shops)");
+        $this->pdo->exec("DELETE FROM usermoduleaccess WHERE UserRoles_URID IN ($roles) OR shop_SHID IN ($shops)");
         $this->pdo->exec("DELETE FROM user WHERE UserName LIKE 'e2e\\_%'");
         $this->pdo->exec("DELETE FROM userroles WHERE UserRoleName LIKE 'e2e %'");
         $this->pdo->exec("DELETE FROM shop WHERE ShopName LIKE 'e2e %'");
@@ -320,14 +360,18 @@ class E2EStock
         $this->down();
         $W = $this->fx->shops['W'];
         $S = $this->fx->shops['S'];
-        //Store Keeper may change GRNs (feature 2) and transfers (4); Cashier may not
+        //Store Keeper may change GRNs (feature 2) and transfers (4); Cashier may not. The ticks
+        //exist once per shop, and this role does the same work in both e2e shops.
         $this->pdo->prepare("UPDATE userroleaccess SET is_create = 1, is_edit = 1, is_verify = 1
             WHERE UserRolls_URID = ? AND SysFeatures_SFID IN (2, 4)")->execute([$this->fx->roles['keeper']]);
         //Store Keeper may use Customer Orders (every right) and sees the Orders menu
         $this->pdo->prepare("UPDATE userroleaccess SET is_view = 1, is_create = 1, is_edit = 1, is_verify = 1
             WHERE UserRolls_URID = ? AND SysFeatures_SFID = (SELECT SFID FROM sysfeatures WHERE FeatureName = 'Customer Orders' LIMIT 1)")
             ->execute([$this->fx->roles['keeper']]);
-        $this->pdo->prepare("INSERT INTO usermoduleaccess (SysModules_SMID, UserRoles_URID) VALUES (2, ?)")->execute([$this->fx->roles['keeper']]);
+        foreach ([$W, $S] as $shop_id) {
+            $this->pdo->prepare("INSERT INTO usermoduleaccess (SysModules_SMID, shop_SHID, UserRoles_URID) VALUES (2, ?, ?)")
+                ->execute([$shop_id, $this->fx->roles['keeper']]);
+        }//each shop
 
         foreach (['bed' => ['E2EBED01', 'e2e Bed', 1000, 1500], 'sheet' => ['E2ESHT01', 'e2e Bedsheet', 200, 350]] as $key => $p) {
             $this->pdo->prepare("INSERT INTO products (Barcode, ItemName, ProdPurchasePrice, ProdSellPrice, ProductStat, ItemType,

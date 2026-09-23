@@ -101,9 +101,10 @@ final class PermissionLookupTest extends DatabaseTestCase
         $this->assertCount(1, $user->getUserRoleFeatureAccess($role, 16));
 
         $_SESSION['shop_id'] = $this->showroom;
-        $this->assertSame([], $user->userAcces($role, 16));
+        //no row at all in this shop: the pages are told every right is off, never nothing
+        $this->assertSame([User::NO_RIGHTS], $user->userAcces($role, 16));
         $this->assertSame(0, $user->getRoleViewAccess($role, 16));
-        $this->assertSame([], $user->getUserRoleFeatureAccess($role, 16));
+        $this->assertSame([User::NO_RIGHTS], $user->getUserRoleFeatureAccess($role, 16));
     }//test the pages read the ticks of the shop that is open
 
     public function test_the_menu_of_a_role_is_the_menu_of_this_shop()

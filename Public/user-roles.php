@@ -115,7 +115,12 @@ super_admin_page(); //system admin only, decided before any of the page is sent
           <div class="col-lg-12">
             <div class="card w-100">
                 <div class="card-body">
-                    <h5 class="card-title fw-semibold mb-4">User Roles</h5>
+                    <h5 class="card-title fw-semibold mb-1">User Roles</h5>
+                    <!-- a role is ticked once per shop (db/SHOP_PERMISSIONS_MODULE.md): say which one -->
+                    <p class="mb-4 text-muted">Every role is ticked separately in each shop. What you see below is what
+                        each role may do in <b><?=htmlspecialchars($shop_name)?></b>; a role with nothing ticked here
+                        lets its users in, but shows them no menu. To set a role up for another shop, switch to that
+                        shop and open this page there.</p>
                     <div class="row">
                       <?php 
                       if($userType==1)
@@ -133,8 +138,8 @@ super_admin_page(); //system admin only, decided before any of the page is sent
                                     <thead>
                                         <tr>
                                             <th class="w-20">User Role</th>
-                                            <th>User Features</th>
-                                            <th>User Modules</th>
+                                            <th>Features in <?=htmlspecialchars($shop_name)?></th>
+                                            <th>Menus in <?=htmlspecialchars($shop_name)?></th>
                                             <th>Status</th>
                                             <th>Action</th>
                                         </tr>
@@ -151,29 +156,43 @@ super_admin_page(); //system admin only, decided before any of the page is sent
                                           <td>
                                               <?php  
                                               $user_features=$ur->select_all_user_role_feature($key['URID'],$shop_id);
-                                              foreach ($user_features as $features) 
+                                              if(empty($user_features))
                                               {
                                                 ?>
-                                                <span class="mb-1 badge text-bg-primary"><?=$features['careteAccess']?></span>
-                                                <span class="mb-1 badge text-bg-primary"><?=$features['editAccess']?></span>
-                                                <span class="mb-1 badge text-bg-primary"><?=$features['viewAccess']?></span>
-                                                <span class="mb-1 badge text-bg-primary"><?=$features['deleteAccess']?></span>
-                                                <span class="mb-1 badge text-bg-primary"><?=$features['verifyAccess']?></span>
-                                                <span class="mb-1 badge text-bg-primary"><?=$features['printAccess']?></span>
+                                                <span class="mb-1 badge text-bg-light text-muted">Nothing ticked here</span>
                                                 <?php
+                                              }
+                                              foreach ($user_features as $features)
+                                              {
+                                                //only the rights this role actually has, not an empty badge for each
+                                                foreach (['careteAccess', 'editAccess', 'viewAccess', 'deleteAccess', 'verifyAccess', 'printAccess'] as $right)
+                                                {
+                                                  if(!empty($features[$right]))
+                                                  {
+                                                    ?>
+                                                    <span class="mb-1 badge text-bg-primary"><?=htmlspecialchars($features[$right])?></span>
+                                                    <?php
+                                                  }
+                                                }
                                               }
                                               ?>
                                           </td>
                                           <td>
                                               <?php
                                               $user_module=$ur->select_all_user_role_module($key['URID'],$shop_id);
-                                              foreach ($user_module as $module) 
+                                              if(empty($user_module))
                                               {
                                                 ?>
-                                                <span class="mb-1 badge text-bg-primary"><?=$module['ModuleName']?></span>
+                                                <span class="mb-1 badge text-bg-light text-muted">No menu here</span>
                                                 <?php
                                               }
-                                              
+                                              foreach ($user_module as $module)
+                                              {
+                                                ?>
+                                                <span class="mb-1 badge text-bg-primary"><?=htmlspecialchars($module['ModuleName'])?></span>
+                                                <?php
+                                              }
+
                                               ?>
                                           </td>
                                           <td>

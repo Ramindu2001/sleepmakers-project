@@ -49,6 +49,10 @@
                             </div>
                         </div>
                     </div>
+                    <!-- the role only says which set of ticks applies; those ticks belong to that shop
+                         alone (db/SHOP_PERMISSIONS_MODULE.md) -->
+                    <p class="text-muted m-2">What the role may do is ticked per shop: sign in to that shop and open
+                        Settings &rarr; User Roles to set it.</p>
                     <p class="text-danger fw-bold m-2" id="assign_error" style="display:none;"></p>
                     <div class="modal-footer">
                         <button type="submit" class="btn bg-primary-subtle text-primary waves-effect" id="btn_submit_shops">Save</button>

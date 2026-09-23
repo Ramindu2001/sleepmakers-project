@@ -107,7 +107,11 @@ super_admin_page(); //system admin only, decided before any of the page is sent
                         <div class="col-lg-12">
                             <div class="card w-100">
                                 <div class="card-body">
-                                    <h5 class="card-title fw-semibold mb-4">Add New User Role</h5>
+                                    <h5 class="card-title fw-semibold mb-1">Edit User Role</h5>
+                                    <!-- a role is ticked once per shop (db/SHOP_PERMISSIONS_MODULE.md): say which one -->
+                                    <p class="mb-4 text-muted">You are editing what <b><?=htmlspecialchars($edit_user[0]['UserRoleName'])?></b>
+                                        may do in <b><?=htmlspecialchars($shop_name)?></b>. The other shops keep their own ticks -
+                                        switch to a shop to change them there. The role name and Status are the same everywhere.</p>
                                     <div class="row">
                                         <div class="col-md-12">
                                             <form action="../Controller/userrolecontrol.php" method="POST" class="">

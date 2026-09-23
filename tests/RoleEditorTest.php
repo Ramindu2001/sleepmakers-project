@@ -25,7 +25,7 @@ final class RoleEditorTest extends DatabaseTestCase
     private function ticks($feature_id, $shop_id)
     {
         $rows = (new User())->userAcces($this->cashier, $feature_id, $shop_id);
-        return empty($rows) ? [] : [(int) $rows[0]['is_view'], (int) $rows[0]['is_edit'], (int) $rows[0]['is_print']];
+        return [(int) $rows[0]['is_view'], (int) $rows[0]['is_edit'], (int) $rows[0]['is_print']];
     }
 
     public function test_ticks_saved_in_one_shop_are_not_ticked_in_the_other()
@@ -34,7 +34,7 @@ final class RoleEditorTest extends DatabaseTestCase
         $this->roles->add_role_module($this->cashier, 1, $this->showroom);
 
         $this->assertSame([1, 1, 1], $this->ticks(16, $this->showroom));
-        $this->assertSame([], $this->ticks(16, $this->warehouse));
+        $this->assertSame([0, 0, 0], $this->ticks(16, $this->warehouse));
         $this->assertCount(1, (new User())->getUserRoleModuleAccess($this->cashier, $this->showroom));
         $this->assertSame([], (new User())->getUserRoleModuleAccess($this->cashier, $this->warehouse));
     }
@@ -51,7 +51,7 @@ final class RoleEditorTest extends DatabaseTestCase
         $this->roles->delete_user_modules($this->cashier, $this->showroom);
 
         $this->assertSame([1, 0, 0], $this->ticks(16, $this->warehouse));
-        $this->assertSame([], $this->ticks(16, $this->showroom));
+        $this->assertSame([0, 0, 0], $this->ticks(16, $this->showroom));
         $this->assertCount(1, (new User())->getUserRoleModuleAccess($this->cashier, $this->warehouse));
         $this->assertSame([], (new User())->getUserRoleModuleAccess($this->cashier, $this->showroom));
     }

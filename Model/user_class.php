@@ -186,6 +186,10 @@ class User extends Dbh
         return $stmt->fetchAll();   
     }//get user by name
 
+    //What a role that has not been ticked for this shop at all may do: nothing. The pages read
+    //$rights[0]['is_view'] without looking first, so the answer is always one row.
+    const NO_RIGHTS = ['is_create' => 0, 'is_edit' => 0, 'is_view' => 0, 'is_delete' => 0, 'is_verify' => 0, 'is_print' => 0];
+
     //Which shop's ticks to read. A role is ticked once per shop (db/SHOP_PERMISSIONS_MODULE.md),
     //so every permission lookup below is about the shop the page is open in. The pages pass no
     //shop of their own: it is the one entered at the shop sign in. No shop open means no rights.
@@ -213,7 +217,7 @@ class User extends Dbh
         $stmt = $this->connect()->prepare($sql);
         $stmt->execute([$userRole_id, self::ticksOfShop($shop_id), $feature_id]);
         $data=$stmt->fetchAll();
-        return $data;
+        return empty($data) ? [self::NO_RIGHTS] : $data;
     }
 
     public function getUserRoleFeatureAccess($userRole_id,$feature_id, $shop_id = null)
@@ -221,7 +225,8 @@ class User extends Dbh
         $sql = "SELECT * FROM `userroleaccess` WHERE UserRolls_URID=? AND shop_SHID=? AND SysFeatures_SFID=?";
         $stmt = $this->connect()->prepare($sql);
         $stmt->execute([$userRole_id, self::ticksOfShop($shop_id), $feature_id]);
-        return $stmt->fetchAll();
+        $data = $stmt->fetchAll();
+        return empty($data) ? [self::NO_RIGHTS] : $data;
     }
 
     public function getRoleViewAccess($userRole_id,$feature_id, $shop_id = null)
