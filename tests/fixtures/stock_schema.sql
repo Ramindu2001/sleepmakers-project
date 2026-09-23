@@ -190,3 +190,41 @@ CREATE TABLE `sections` (
 -- rack 1: the default rack every shop without racks uses (manual GRN entry writes Rack_RKID 1)
 INSERT INTO `sections` (`SEID`, `SectionNo`, `SectionName`, `shop_SHID`) VALUES (1, 'SE_000001', 'Default Section', 0);
 INSERT INTO `rack` (`RKID`, `RackNo`, `RackName`, `Sections_SEID`) VALUES (1, 'RK_000001', 'Default Rack', 1);
+
+-- barcode module: the shop's rules and the running counters (db/BARCODE_MODULE.md)
+CREATE TABLE `barcodesettings` (
+  `BSID` int(11) NOT NULL AUTO_INCREMENT,
+  `shop_SHID` int(11) NOT NULL,
+  `AutoGenerate` tinyint(4) NOT NULL DEFAULT 1,
+  `Pattern` varchar(160) NOT NULL DEFAULT '{PREFIX}{CAT}{SUB}{SEQ}',
+  `FixedPrefix` varchar(24) NOT NULL DEFAULT '',
+  `Suffix` varchar(24) NOT NULL DEFAULT '',
+  `ShopCode` varchar(12) NOT NULL DEFAULT '',
+  `Separator` varchar(4) NOT NULL DEFAULT '',
+  `CatCodeLength` tinyint(4) NOT NULL DEFAULT 3,
+  `SubCodeLength` tinyint(4) NOT NULL DEFAULT 3,
+  `SeqScope` varchar(16) NOT NULL DEFAULT 'pattern',
+  `SeqStart` bigint(20) NOT NULL DEFAULT 1,
+  `SeqStep` int(11) NOT NULL DEFAULT 1,
+  `SeqLength` tinyint(4) NOT NULL DEFAULT 5,
+  `SeqPadChar` varchar(1) NOT NULL DEFAULT '0',
+  `Casing` varchar(8) NOT NULL DEFAULT 'upper',
+  `Symbology` varchar(12) NOT NULL DEFAULT 'CODE128',
+  `MaxLength` tinyint(4) NOT NULL DEFAULT 45,
+  `StripInvalid` tinyint(4) NOT NULL DEFAULT 1,
+  `LabelDefaults` text DEFAULT NULL,
+  `UpdatedDate` datetime DEFAULT NULL,
+  `UpdateUserID` int(11) DEFAULT NULL,
+  PRIMARY KEY (`BSID`),
+  UNIQUE KEY `uq_barcodesettings_shop` (`shop_SHID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+CREATE TABLE `barcodesequence` (
+  `BQID` bigint(20) NOT NULL AUTO_INCREMENT,
+  `shop_SHID` int(11) NOT NULL,
+  `ScopeKey` varchar(160) NOT NULL,
+  `NextValue` bigint(20) NOT NULL DEFAULT 1,
+  `UpdatedDate` datetime DEFAULT NULL,
+  PRIMARY KEY (`BQID`),
+  UNIQUE KEY `uq_barcodesequence` (`shop_SHID`,`ScopeKey`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;

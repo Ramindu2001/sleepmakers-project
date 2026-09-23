@@ -32,6 +32,7 @@ abstract class DatabaseTestCase extends TestCase
             (new ScanUploadMigration($this->pdo))->run();
             (new CustomerOrdersMigration($this->pdo))->run();
             (new ShopPermissionsMigration($this->pdo))->run();
+            (new UnitBarcodesMigration($this->pdo))->run();
         }//migrated schema
     }//setUp
 

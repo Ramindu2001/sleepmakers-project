@@ -23,6 +23,10 @@ db/*
 !db/shop_permissions_install.php
 !db/shop_permissions.sql
 !db/SHOP_PERMISSIONS_MODULE.md
+!db/unit_barcodes_migration.php
+!db/unit_barcodes_install.php
+!db/unit_barcodes.sql
+!db/UNIT_BARCODES_MODULE.md
 /*.sql
 
 .env
