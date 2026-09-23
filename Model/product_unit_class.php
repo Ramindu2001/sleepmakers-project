@@ -93,6 +93,20 @@ class ProductUnits extends Dbh
         return strlen($this->build($settings, 'X', date('Y-m-d'), 1)) - 1;
     }//suffix length
 
+    //Which number series a unit takes its serial from: everything in the code except the
+    //serial itself. So {ITEM}{YY}{MM}{SEQ} gives one series per item per month, and the
+    //numbering starts again at 1 whenever that part changes - the same rule the product
+    //barcodes follow ("per prefix" in db/BARCODE_MODULE.md).
+    public function scopeKey(array $settings, $item_barcode, $produced_date)
+    {
+        $prefix = $this->build($settings, $item_barcode, $produced_date, null);
+        if($settings['separator'] !== '')
+        {
+            $prefix = rtrim($prefix, $settings['separator']);
+        }//never end on a separator
+        return 'unit:' . strtoupper($prefix);
+    }//scope key
+
     //what a unit code looks like under this shop's rules, for the settings page
     public function sample($shop_id, $item_barcode = 'COO00001', $produced_date = null)
     {
@@ -109,7 +123,8 @@ class ProductUnits extends Dbh
         {
             $parts[$token] = date($format, $time);
         }//each date part
-        $parts['{SEQ}'] = str_pad((string)(int)$seq, $settings['seq_length'], '0', STR_PAD_LEFT);
+        //$seq null: the code without its serial, which is what names the number series
+        $parts['{SEQ}'] = $seq === null ? '' : str_pad((string)(int)$seq, $settings['seq_length'], '0', STR_PAD_LEFT);
 
         $code = $settings['pattern'];
         if($settings['separator'] !== '')
@@ -148,7 +163,7 @@ class ProductUnits extends Dbh
         $settings = $this->settings($shop_id);
         $pdo = $this->connect();
         $barcodes = new BarcodeSettings();
-        $scope = 'unit:' . strtoupper($this->build($settings, $item, $date, 0));  //everything but the serial
+        $scope = $this->scopeKey($settings, $item, $date);
 
         $insert = $pdo->prepare("INSERT INTO productunits (UnitBarcode, ItemBarcode, products_PDID, shop_SHID,
             ProducedDate, SeqNo, UnitStat, PrintRef, PrintedAt, PrintedBy, PrintCount)

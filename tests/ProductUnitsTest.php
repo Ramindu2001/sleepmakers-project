@@ -52,6 +52,18 @@ final class ProductUnitsTest extends DatabaseTestCase
         $this->assertSame(['LIN0000125090001'], $this->print($this->sheet, '2025-09-12', 1)['codes']);
     }
 
+    public function test_the_number_series_is_named_after_everything_but_the_serial()
+    {
+        $rules = $this->units->settings($this->warehouse);
+
+        $this->assertSame('unit:COO000012509', $this->units->scopeKey($rules, 'COO00001', '2025-09-12'));
+        $this->assertSame('unit:COO000012510', $this->units->scopeKey($rules, 'COO00001', '2025-10-01'));
+        $this->assertSame('unit:LIN000012509', $this->units->scopeKey($rules, 'LIN00001', '2025-09-12'));
+
+        $dashed = ['mode' => true, 'pattern' => '{ITEM}-{YY}-{MM}-{SEQ}', 'seq_length' => 4, 'separator' => '-'];
+        $this->assertSame('unit:COO00001-25-09', $this->units->scopeKey($dashed, 'COO00001', '2025-09-12'));
+    }
+
     public function test_the_shop_can_change_the_pattern()
     {
         $this->insert('barcodesettings', ['shop_SHID' => $this->warehouse, 'UnitMode' => 1,
