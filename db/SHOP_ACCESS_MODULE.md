@@ -48,7 +48,7 @@ Assignments whose user no longer exists get role `0` and are revoked; the instal
   active assignment, to an active shop, with an active role, while their account is active.
   Expired or inactive companies stay closed to non-admins, as before.
 - **What they may do there:** the feature and module rights of the role they hold **in that
-  shop**. The role screens (*Settings → User Roles*) are unchanged.
+  shop**, as that role is ticked **in that shop** - see `db/SHOP_PERMISSIONS_MODULE.md`.
 - Revoking access, deactivating the role or changing it takes effect on the user's next click,
   and on idle screens within about 10 seconds.
 - `user.UserRoles_URID` is shown as **Default Role**: the role offered when the user is added
@@ -64,7 +64,7 @@ Assignments whose user no longer exists get role `0` and are revoked; the instal
 | **Delete** | only when the user has no GRN, adjustment, invoice or transfer in that shop - otherwise use Revoke |
 
 Example: to let a store keeper check stock in the Warehouse but not in the showroom, give them a
-role with *Store → View* in the Warehouse row and revoke (or never add) the showroom row.
+role with *Store → View* ticked **in the Warehouse** and revoke (or never add) the showroom row.
 
 ### Users, roles and passwords - system admin only
 
