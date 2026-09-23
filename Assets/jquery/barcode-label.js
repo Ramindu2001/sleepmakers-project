@@ -711,11 +711,29 @@ window.BC_LABEL_JS = 4;
             });
         });
 
+        //--------------------------------------------- a unique barcode per unit
+        /* The production date only means anything while the mode is on, and the
+           Labels column then counts units to number rather than copies to print. */
+        function unitMode() {
+            var on = $("#bc_unit_mode").is(":checked");
+            $("#bc_unit_date_row").toggle(on);
+            $(".bc-qty-head").text(on ? "Units" : "Labels");
+            return on;
+        }
+
+        $("#bc_unit_mode").on("change", unitMode);
+        unitMode();
+
         //------------------------------------------------------------ submit
         $("#barcode_print_form").on("submit", function () {
             if ($("#bc_items_body .bc-qty").length === 0) {
                 return false;
             }
+
+            if ($("#bc_unit_mode").is(":checked") && !$("#bc_produced_date").val()) {
+                $("#bc_error").text("Enter the date these units were made.").show();
+                return false;
+            }//a unit code carries its production date
 
             /* Somebody can hit Print with a quantity box still empty, because
                blur never fired. Fill those in rather than sending a blank. */

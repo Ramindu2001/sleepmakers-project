@@ -543,13 +543,42 @@ function bcChk($name, $label, $checked, $extra_class = '')
                         <div class="mt-1">Press <kbd>Ctrl</kbd> + <kbd>F5</kbd> (or <kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>R</kbd> on a Mac) to reload, then try again.</div>
                     </div>
 
+                    <?php
+                    //A unique barcode on every unit (db/UNIT_BARCODES_MODULE.md): only offered
+                    //where the shop has switched it on, so nothing changes for anyone else.
+                    require_once __DIR__ . '/../../Model/unit_barcode_refused_class.php';
+                    require_once __DIR__ . '/../../Model/product_unit_class.php';
+                    if ((new ProductUnits())->modeOn($shop_id)) {
+                    ?>
+                    <div class="border rounded p-3 mt-3" id="bc_unit_wrap">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="bc_unit_mode" name="print_mode"
+                                   value="units" checked>
+                            <label class="form-check-label fw-semibold" for="bc_unit_mode">
+                                A unique barcode on every unit
+                            </label>
+                        </div>
+                        <div class="text-muted fs-2 mt-1" id="bc_unit_hint">
+                            Each label gets its own code, kept on record, so no unit can ever be received twice.
+                            Untick it to print the plain product barcode, for a shelf label.
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mt-2" id="bc_unit_date_row">
+                            <label class="form-label mb-0 text-muted fs-2" for="bc_produced_date">Made on</label>
+                            <input type="date" class="form-control form-control-sm" style="max-width:190px;"
+                                   id="bc_produced_date" name="produced_date"
+                                   value="<?php echo date('Y-m-d'); ?>" max="<?php echo date('Y-m-d'); ?>">
+                            <span class="text-muted fs-2">the production date the codes carry</span>
+                        </div>
+                    </div>
+                    <?php }//unit barcodes are on ?>
+
                     <div id="bc_items_wrap" class="border rounded bc-items-wrap" style="display:none;">
                         <table class="table table-sm align-middle bc-items">
                             <thead>
                                 <tr>
                                     <th>Item</th>
                                     <th style="width:180px;">Label price</th>
-                                    <th style="width:100px;">Labels</th>
+                                    <th style="width:100px;" class="bc-qty-head">Labels</th>
                                     <th style="width:44px;"></th>
                                 </tr>
                             </thead>

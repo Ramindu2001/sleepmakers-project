@@ -57,6 +57,40 @@ if($barcodevalue !== "")
         }
     }
 
+    /*
+     * Not a product code. Where the shop prints a unique barcode on every unit
+     * (db/UNIT_BARCODES_MODULE.md) the sticker on the box carries the unit's own
+     * code, so the till looks that up and sells the product it belongs to.
+     */
+    if(count($itemData) == 0)
+    {
+        require_once "../../Model/unit_barcode_refused_class.php";
+        require_once "../../Model/product_unit_class.php";
+
+        $unitObj = new ProductUnits();
+        $unitRows = $unitObj->resolve([$barcodevalue], $shop_id);
+
+        if(count($unitRows) > 0)
+        {
+            $unit = reset($unitRows);
+
+            if($multi_category==1)
+            {
+                $sql = "SELECT * FROM products p
+                        INNER JOIN shop s ON s.SHID=p.shop_SHID
+                        WHERE p.Barcode = ? AND s.Company_CMID = ?";
+                $params = [$unit['ItemBarcode'], $com_id];
+            }
+            else
+            {
+                $sql = "SELECT * FROM products WHERE Barcode = ? AND shop_SHID = ?";
+                $params = [$unit['ItemBarcode'], $shop_id];
+            }
+
+            $itemData = $dbObj->getMultipleData($sql, $params);
+        }//a unit we printed
+    }//try the unit barcodes
+
     echo json_encode($itemData);
 }
 else

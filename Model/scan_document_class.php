@@ -7,12 +7,38 @@ abstract class ScanDocument extends Dbh
 {
     protected $access;
     protected $batches;
+    protected $units;
 
     public function __construct()
     {
         $this->access = new ShopAccess();
         $this->batches = new ScanBatches();
+        $this->units = new ProductUnits();
     }//construct
+
+    //Where a shop prints a unique barcode on every unit (db/UNIT_BARCODES_MODULE.md), fold the
+    //unit codes that were read into the item each belongs to: every unit counts one for its
+    //product, however often its code was read. Codes that are not units stay unknown.
+    protected function foldUnits(array $parsed, $shop_id)
+    {
+        $codes = array_merge(array_keys($parsed['units']), array_keys($parsed['unknown']));
+        if(!empty($codes))
+        {
+            foreach($this->units->resolve($codes, $shop_id) as $code => $unit)
+            {
+                $item = trim((string)$unit['ItemBarcode']);
+                $parsed['items'][$item] = (isset($parsed['items'][$item]) ? $parsed['items'][$item] : 0) + 1;
+                unset($parsed['units'][$code], $parsed['unknown'][(string)$code]);
+            }//each unit we printed
+        }
+
+        foreach($parsed['units'] as $code => $qty)
+        {
+            $parsed['unknown'][$code] = $qty;
+        }//shaped like a unit, but never printed
+        $parsed['units'] = [];
+        return $parsed;
+    }//fold units
 
     //a preview line for a code that cannot be used as it is
     protected function errorLine($key, $qty, $message, ?array $product = null)
@@ -59,9 +85,11 @@ abstract class ScanDocument extends Dbh
                 $blocking++;
                 continue;
             }
-            if($line['barcode'] !== null && $line['apply_qty'] > 0)
+            //'fingerprint' is for lines that share a barcode - one per production date, say
+            $signature = isset($line['fingerprint']) ? $line['fingerprint'] : $line['barcode'];
+            if($signature !== null && $line['apply_qty'] > 0)
             {
-                $applied[$line['barcode']] = $line['apply_qty'];
+                $applied[$signature] = $line['apply_qty'];
             }
         }
         unset($line);

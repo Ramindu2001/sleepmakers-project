@@ -37,6 +37,7 @@ class GrnScan extends ScanDocument
                     $pdo->prepare("UPDATE grndetails SET InitQty = ?, CurrentQty = ?, TotalPurchasePrice = ?, TotalSellPrice = ? WHERE GDID = ?;")
                         ->execute([$newQty, $newQty, round($newQty * (float)$row['UnitPurchasePrice'], 2),
                             round($newQty * (float)$row['UnitSellPrice'], 2), $line['existing_id']]);
+                    $detail_id = (int)$line['existing_id'];
                 }//adds to the line already there
                 else
                 {
@@ -47,7 +48,19 @@ class GrnScan extends ScanDocument
                             $line['selling_price'], round($line['apply_qty'] * (float)$line['purchase_price'], 2),
                             round($line['apply_qty'] * (float)$line['selling_price'], 2), $line['mnf_date'], $line['exp_date'],
                             $preview['variation_id'], $line['product_id'], $header['GHID'], $preview['rack_id']]);
+                    $detail_id = (int)$pdo->lastInsertId();
                 }//new line
+
+                if(!empty($line['unit_codes']))
+                {
+                    //the units join this line, and can never join another one
+                    $taken = $this->units->markReceived($line['unit_codes'], $header['GHID'], $detail_id, $user_id);
+                    if($taken !== count($line['unit_codes']))
+                    {
+                        throw new ScanRefused(409, 'Someone took some of those units into another GRN a moment ago. Check the list again.');
+                    }//another upload won the race - nothing of this one is written
+                }//units
+
                 $lines++;
                 $qty += $line['apply_qty'];
             }//each line
@@ -97,7 +110,9 @@ class GrnScan extends ScanDocument
             $shop_ids = $stmt->fetchAll(PDO::FETCH_COLUMN);
         }//the company's products, as the GRN product search offers
         $byCode = $this->productsByBarcode($shop_ids);
-        $parsed = ScanParser::parse($raw, self::knownBarcodes($byCode));
+        //where the shop numbers every unit, a unit code is an item code plus a fixed number of
+        //characters; the parser sets those tokens aside and the database decides what they are
+        $parsed = ScanParser::parse($raw, self::knownBarcodes($byCode), $this->units->suffixLength($shop['SHID']));
 
         $options = [
             'label_price' => (int)$shop['is_labelprice'] === 1,
@@ -145,10 +160,66 @@ class GrnScan extends ScanDocument
                 $lines[] = $this->line($header, $shop, $options, $product, $barcode, $qty, $decisions);
             }
         }//each code
-        foreach($parsed['unknown'] as $token => $qty)
+
+        //the unit codes, and anything unknown that might still be one (an older code shape)
+        $resolved = $this->units->resolve(array_merge(array_keys($parsed['units']), array_keys($parsed['unknown'])), $shop['SHID']);
+        $groups = [];
+        foreach($parsed['units'] + $parsed['unknown'] as $code => $scanned)
         {
-            $lines[] = $this->errorLine($token, $qty, 'Not a product in this shop');
-        }
+            $code = (string)$code;
+            if(!isset($resolved[$code]))
+            {
+                $lines[] = $this->errorLine($code, $scanned, isset($parsed['units'][$code])
+                    ? 'Not a unit we printed' : 'Not a product in this shop');
+                continue;
+            }//nothing of ours
+
+            $unit = $resolved[$code];
+            if((int)$unit['UnitStat'] === ProductUnits::RECEIVED)
+            {
+                $lines[] = $this->errorLine($code, $scanned, 'Already received on '
+                    . ($unit['GRNHeaderNo'] === null ? 'another GRN' : $unit['GRNHeaderNo']));
+                continue;
+            }//taken in before - never a second time
+
+            //the unit's item, as this shop carries it: the same rules a product code gets
+            $item = strtoupper($unit['ItemBarcode']);
+            [$product, $reason] = isset($byCode[$item]) ? $this->pickProduct($byCode[$item], $shop['SHID'])
+                : [null, 'Not a product in this shop'];
+            if($product === null)
+            {
+                $lines[] = $this->errorLine($code, $scanned, $reason);
+                continue;
+            }
+            if($product['ItemType'] !== 'P')
+            {
+                $lines[] = $this->errorLine($code, $scanned, 'Service item - no stock', $product);
+                continue;
+            }
+            if((int)$product['ProductStat'] !== 1)
+            {
+                $lines[] = $this->errorLine($code, $scanned, 'Inactive product', $product);
+                continue;
+            }
+            if(isset($withVariations[(int)$product['PDID']]))
+            {
+                $lines[] = $this->errorLine($code, $scanned, 'Has variations - use Add Products', $product);
+                continue;
+            }
+
+            $key = 'unit:' . $unit['ItemBarcode'] . ':' . $unit['ProducedDate'];
+            if(!isset($groups[$key]))
+            {
+                $groups[$key] = ['product' => $product, 'date' => $unit['ProducedDate'], 'codes' => [], 'twice' => 0];
+            }
+            $groups[$key]['codes'][] = $unit['UnitBarcode'];
+            $groups[$key]['twice'] += $scanned - 1;     //a code read more than once is still one unit
+        }//each unit code
+
+        foreach($groups as $key => $group)
+        {
+            $lines[] = $this->unitLine($header, $shop, $options, $group, $key, $decisions);
+        }//each product and production date
 
         return $this->finish([
             'context' => 'grn',
@@ -162,7 +233,9 @@ class GrnScan extends ScanDocument
         ], $decisions, ScanBatches::GRN);
     }//build
 
-    private function line(array $header, array $shop, array $options, array $product, $barcode, $qty, array $decisions)
+    //One product's line. $produced_date is set for units: the line then belongs to that
+    //production date, so units made on two days never land in one line.
+    private function line(array $header, array $shop, array $options, array $product, $barcode, $qty, array $decisions, $produced_date = null)
     {
         $pdo = $this->connect();
         $line = [
@@ -171,9 +244,12 @@ class GrnScan extends ScanDocument
             'can_leave_out' => true, 'editable' => false, 'existing_id' => null, 'existing_qty' => null, 'prices_locked' => false,
         ];
 
-        $stmt = $pdo->prepare("SELECT GDID, InitQty, UnitPurchasePrice, UnitSellPrice, UnitLabelPrice, MnfDate, ExpDate FROM grndetails
-            WHERE GRNHeader_GHID = ? AND products_PDID = ? ORDER BY GDID DESC LIMIT 1;");
-        $stmt->execute([$header['GHID'], $product['PDID']]);
+        $sql = "SELECT GDID, InitQty, UnitPurchasePrice, UnitSellPrice, UnitLabelPrice, MnfDate, ExpDate FROM grndetails
+            WHERE GRNHeader_GHID = ? AND products_PDID = ?" . ($produced_date === null ? '' : " AND MnfDate <=> ?")
+            . " ORDER BY GDID DESC LIMIT 1;";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($produced_date === null ? [$header['GHID'], $product['PDID']]
+            : [$header['GHID'], $product['PDID'], $produced_date]);
         $existing = $stmt->fetch(PDO::FETCH_ASSOC);
         if($existing !== false)
         {
@@ -227,9 +303,21 @@ class GrnScan extends ScanDocument
             }//no price anywhere
         }//each price
 
-        $mnf = date('Y-m-d');
+        $mnf = $produced_date === null ? date('Y-m-d') : $produced_date;
         $exp = date('Y-m-d');                   //manual entry stamps today when the shop has no expiry
-        if($options['expiry'])
+        if($options['expiry'] && $produced_date !== null)
+        {
+            //the unit says when it was made; only the expiry is still the operator's to enter
+            $dates = (isset($decisions['dates'][$product['PDID']]) && is_array($decisions['dates'][$product['PDID']])) ? $decisions['dates'][$product['PDID']] : [];
+            $typedExp = (isset($dates['exp']) && is_string($dates['exp'])) ? $dates['exp'] : '';
+            $exp = self::validDate($typedExp);
+            if($exp === null || !($exp > $mnf))
+            {
+                $problem = $problem ?: 'Enter an Exp date after ' . $mnf;
+                $exp = $typedExp;
+            }
+        }//units, with expiry tracked
+        elseif($options['expiry'])
         {
             $dates = (isset($decisions['dates'][$product['PDID']]) && is_array($decisions['dates'][$product['PDID']])) ? $decisions['dates'][$product['PDID']] : [];
             $typedMnf = (isset($dates['mnf']) && is_string($dates['mnf'])) ? $dates['mnf'] : '';
@@ -262,6 +350,36 @@ class GrnScan extends ScanDocument
         }
         return $line;
     }//line
+
+    //One line for the units of one product made on one day. Its quantity is how many DIFFERENT
+    //unit codes were read: a code read twice is still one unit (db/UNIT_BARCODES_MODULE.md).
+    private function unitLine(array $header, array $shop, array $options, array $group, $key, array $decisions)
+    {
+        $count = count($group['codes']);
+        $line = $this->line($header, $shop, $options, $group['product'], trim($group['product']['Barcode']),
+            $count, $decisions, $group['date']);
+
+        $message = $count . ' unit(s) made ' . $group['date'];
+        if($group['twice'] > 0)
+        {
+            $message .= ', ' . $group['twice'] . ' scanned twice';
+        }//read more than once, counted once
+        if($line['existing_id'] !== null)
+        {
+            $message .= ' - adds to the line already on this GRN: '
+                . self::qty($line['existing_qty']) . ' → ' . self::qty((float)$line['existing_qty'] + $count);
+        }//joins what is there
+
+        $line['key'] = $key;
+        $line['fingerprint'] = $key;            //two dates of one product are two batches
+        $line['unit_codes'] = $group['codes'];
+        $line['message'] = $message;
+        if($group['twice'] > 0 && $line['status'] === 'ok')
+        {
+            $line['status'] = 'warn';
+        }//worth a look, but nothing to fix
+        return $line;
+    }//unit line
 
     private function racks($shop_id)
     {

@@ -143,7 +143,9 @@ class TransferScan extends ScanDocument
     {
         $shop_id = (int)$header['TransferFrom'];
         $byCode = $this->productsByBarcode([$shop_id]);
-        $parsed = ScanParser::parse($raw, self::knownBarcodes($byCode));
+        //a unit code counts for the item it belongs to (db/UNIT_BARCODES_MODULE.md)
+        $parsed = ScanParser::parse($raw, self::knownBarcodes($byCode), $this->units->suffixLength($shop_id));
+        $parsed = $this->foldUnits($parsed, $shop_id);
 
         //what this transfer already takes from each batch (inventory row), and its line there
         $stmt = $this->connect()->prepare("SELECT TDID, InventoryID, TransferQty FROM transferdetails WHERE TransferHeader_THID = ? ORDER BY TDID;");
@@ -193,6 +195,7 @@ class TransferScan extends ScanDocument
 
     private function buildReceive(array $header, $raw, array $decisions)
     {
+        $shop_id = (int)$header['TransferTo'];
         $stmt = $this->connect()->prepare("SELECT transferdetails.TDID, transferdetails.products_PDID, transferdetails.TransferQty,
             products.Barcode, products.ItemName FROM transferdetails
             INNER JOIN products ON products.PDID = transferdetails.products_PDID
@@ -214,7 +217,11 @@ class TransferScan extends ScanDocument
             $groups[$key]['sent'] += (float)$row['TransferQty'];
             $groups[$key]['tdids'][] = (int)$row['TDID'];
         }
-        $parsed = ScanParser::parse($raw, array_values(array_filter(array_column($groups, 'barcode'), 'is_string')));
+        //a unit code counts for the item it belongs to: the receiving shop checks the boxes it
+        //was sent by scanning their stickers (db/UNIT_BARCODES_MODULE.md)
+        $parsed = ScanParser::parse($raw, array_values(array_filter(array_column($groups, 'barcode'), 'is_string')),
+            $this->units->suffixLength($shop_id));
+        $parsed = $this->foldUnits($parsed, $shop_id);
 
         $lines = [];
         $short = 0;

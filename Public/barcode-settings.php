@@ -207,6 +207,7 @@ function bcsE($value)
                             . (isset($_SESSION['barcode_codes_filled'])
                                 ? ' (' . (int) $_SESSION['barcode_codes_filled'] . ' updated).' : '.')),
                         7 => array('danger',  'The settings could not be saved. Run db/barcode_module_install.php and try again.'),
+                        8 => array('danger',  'A unit code must keep {ITEM} and {SEQ}, or two units could share a code.'),
                     );
 
                     if (isset($messages[$status])) {
@@ -574,6 +575,80 @@ function bcsE($value)
             </div>
 
             </form>
+
+            <!-- =========================== a unique barcode on every unit ===
+                 db/UNIT_BARCODES_MODULE.md. Its own form, so saving the product
+                 rules above never touches these and the other way round. -->
+            <?php
+            require_once __DIR__ . '/../Model/unit_barcode_refused_class.php';
+            require_once __DIR__ . '/../Model/product_unit_class.php';
+            $unitObj = new ProductUnits();
+            $unitRules = $unitObj->settings($shop_id);
+            $unitSample = $unitObj->sample($shop_id, 'COO00001');
+            ?>
+            <div class="row">
+                <div class="col-12 col-lg-7">
+                    <form action="../Controller/barcodeSettingsController.php" method="POST">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title fw-semibold mb-0" style="margin-top:0;">A Unique Barcode On Every Unit</h5>
+                                <span class="text-muted fs-2">
+                                    For a shop that makes what it sells: every unit gets its own code, so no unit can be
+                                    received twice and you can count what was produced on any day.
+                                </span>
+                            </div>
+                            <div class="card-body">
+
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="UnitMode" name="UnitMode" value="1"
+                                        <?php echo $unitRules['mode'] ? 'checked' : ''; ?>>
+                                    <label class="form-check-label" for="UnitMode">
+                                        Print a unique barcode on every unit
+                                    </label>
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-6">
+                                        <label class="form-label fs-2 text-muted mb-1" for="UnitPattern">Unit code pattern</label>
+                                        <input type="text" class="form-control" id="UnitPattern" name="UnitPattern"
+                                               value="<?php echo bcsE($unitRules['pattern']); ?>" maxlength="160">
+                                        <span class="text-muted fs-2">
+                                            {ITEM} the product's barcode, {YY} {MM} {DD} {YYYY} the production date,
+                                            {SEQ} the serial. {ITEM} and {SEQ} are required.
+                                        </span>
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <label class="form-label fs-2 text-muted mb-1" for="UnitSeqLength">Serial digits</label>
+                                        <input type="number" class="form-control" id="UnitSeqLength" name="UnitSeqLength"
+                                               min="1" max="9" value="<?php echo (int) $unitRules['seq_length']; ?>">
+                                    </div>
+                                    <div class="col-6 col-md-3">
+                                        <label class="form-label fs-2 text-muted mb-1" for="UnitSeparator">Separator</label>
+                                        <input type="text" class="form-control" id="UnitSeparator" name="UnitSeparator"
+                                               maxlength="4" value="<?php echo bcsE($unitRules['separator']); ?>"
+                                               placeholder="none">
+                                    </div>
+                                </div>
+
+                                <div class="alert alert-light border mt-3 mb-0 py-2">
+                                    <span class="text-muted fs-2">A unit of COO00001 made today would be</span>
+                                    <span class="fw-semibold font-monospace ms-1"><?php echo bcsE($unitSample); ?></span>
+                                </div>
+
+                                <div class="d-flex justify-content-end gap-2 mt-4">
+                                    <a href="unit-barcodes.php" class="btn btn-light border">Units printed</a>
+                                    <?php if ($userType == 1 || (isset($edit) && $edit == 1)) { ?>
+                                        <button type="submit" name="btn_save_unit_settings" value="1" class="btn btn-primary">
+                                            <i class="ti ti-device-floppy"></i> Save Unit Rules
+                                        </button>
+                                    <?php } ?>
+                                </div>
+
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
 
             <!-- ==================================== running counters ===== -->
             <div class="row">

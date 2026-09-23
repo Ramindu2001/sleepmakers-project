@@ -59,6 +59,34 @@ if (isset($_POST['btn_save_barcode_settings'])) {
     bcsReturn(1); //saved
 }//save settings
 
+//=================================== a unique barcode on every unit ===
+if (isset($_POST['btn_save_unit_settings'])) {
+
+    require_once __DIR__ . '/../Model/unit_barcode_refused_class.php';
+    require_once __DIR__ . '/../Model/product_unit_class.php';
+
+    /*
+     * The pattern must keep a serial, or two units of the same item made on the
+     * same day would share a code. ProductUnits::settings() appends one anyway;
+     * this refuses instead, so nobody saves a rule that is not what they typed.
+     */
+    $pattern = strtoupper(trim((string) (isset($_POST['UnitPattern']) ? $_POST['UnitPattern'] : '')));
+    $pattern = ($pattern === '') ? ProductUnits::DEFAULTS['pattern'] : substr($pattern, 0, 160);
+
+    if (strpos($pattern, '{ITEM}') === false || strpos($pattern, '{SEQ}') === false) {
+        bcsReturn(8); //a unit code needs the item and a serial
+    }//not a usable rule
+
+    $saved = $bcObj->saveUnitSettings($shop_id, array(
+        'UnitMode'      => isset($_POST['UnitMode']) ? 1 : 0,
+        'UnitPattern'   => $pattern,
+        'UnitSeqLength' => max(1, min(9, (int) (isset($_POST['UnitSeqLength']) ? $_POST['UnitSeqLength'] : 4))),
+        'UnitSeparator' => substr((string) (isset($_POST['UnitSeparator']) ? $_POST['UnitSeparator'] : ''), 0, 4),
+    ), $user_id);
+
+    bcsReturn($saved ? 1 : 7);
+}//save unit settings
+
 //====================================================== sequence counters ====
 else if (isset($_POST['btn_reset_sequence'])) {
 

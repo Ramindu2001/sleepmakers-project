@@ -101,6 +101,77 @@ if (isset($_POST['btn_print_barcode'])) {
         );
     }//foreach row
 
+    /*
+     * A unique barcode on every unit (db/UNIT_BARCODES_MODULE.md). "units" numbers
+     * this many new units, made on the given day; "reprint" puts the codes of an
+     * earlier job on paper again without numbering anything new.
+     */
+    $mode = isset($_POST['print_mode']) ? (string) $_POST['print_mode'] : 'product';
+
+    if ($mode === 'units' || $mode === 'reprint') {
+        require_once __DIR__ . '/../Model/unit_barcode_refused_class.php';
+        require_once __DIR__ . '/../Model/product_unit_class.php';
+
+        $unitObj = new ProductUnits();
+
+        try {
+            if ($mode === 'reprint') {
+                $ref = substr(trim((string) (isset($_POST['print_ref']) ? $_POST['print_ref'] : '')), 0, 20);
+                $again = $unitObj->forPrintRef($shop_id, $ref);
+                if (empty($again)) {
+                    throw new UnitBarcodeRefused(404, 'That print job is not in this shop.');
+                }//nothing to reprint
+
+                /*
+                 * A reprint is started from the Unit Barcodes page, which has no
+                 * label dialog behind it: the rows and the options come from the
+                 * units themselves and from the shop's saved label defaults.
+                 */
+                if (empty($job['items'])) {
+                    $counts = array();
+                    foreach ($again as $unit) {
+                        $id = (int) $unit['products_PDID'];
+                        $counts[$id] = (isset($counts[$id]) ? $counts[$id] : 0) + 1;
+                    }//per product
+                    foreach ($counts as $id => $count) {
+                        $job['items'][] = array('id' => $id, 'price' => 0, 'qty' => $count, 'batch' => '');
+                    }//one row each
+                }//started from the units page
+
+                if (empty($_POST['bc_size'])) {
+                    require_once __DIR__ . '/../Model/barcode_settings_class.php';
+                    $stored = (new BarcodeSettings())->getSettings($shop_id);
+                    $job['options'] = bcShopLabelDefaults(isset($stored['LabelDefaults']) ? $stored['LabelDefaults'] : '');
+                }//the shop's own label settings
+
+                $unitObj->reprint($shop_id, $ref);
+                $job['print_ref'] = $ref;
+            }//again, the same codes
+            else {
+                if (!bcUserRight($dbObj, $user_id, 'is_create') && !bcUserRight($dbObj, $user_id, 'is_edit')) {
+                    throw new UnitBarcodeRefused(403, 'You may not number new units.');
+                }//printing new numbers is a change
+
+                $produced = isset($_POST['produced_date']) ? (string) $_POST['produced_date'] : '';
+                $wanted = array();
+                foreach ($job['items'] as $item) {
+                    $wanted[$item['id']] = $item['qty'];
+                }//how many of each
+
+                $batch = $unitObj->allocateBatch($shop_id, $wanted, $produced, $user_id);
+                foreach ($job['items'] as $index => $item) {
+                    $job['items'][$index]['qty'] = $batch['counts'][$item['id']];
+                }//what was really numbered
+                $job['print_ref'] = $batch['print_ref'];
+            }//new numbers
+        }//try
+        catch (UnitBarcodeRefused $e) {
+            $_SESSION['barcode_error'] = $e->getMessage();
+            header("Location: product.php");
+            exit;
+        }//nothing was numbered
+    }//unit barcodes
+
     $_SESSION['barcode_job'] = $job;
 
     header("Location: print-barcode.php");
@@ -133,6 +204,22 @@ foreach ($job['items'] as $item) {
 
 $products = bcGetPrintableProducts($dbObj, $requested_ids, $shop_id, $company_id, $multi_category);
 
+/*
+ * A unit job prints the units of one print reference: one sticker per unit, each
+ * with its own code, read from the database and never from the browser.
+ */
+$unit_codes = array();
+$unit_ref   = isset($job['print_ref']) ? (string) $job['print_ref'] : '';
+
+if ($unit_ref !== '') {
+    require_once __DIR__ . '/../Model/unit_barcode_refused_class.php';
+    require_once __DIR__ . '/../Model/product_unit_class.php';
+
+    foreach ((new ProductUnits())->forPrintRef($shop_id, $unit_ref) as $unit) {
+        $unit_codes[(int) $unit['products_PDID']][] = (string) $unit['UnitBarcode'];
+    }//each unit of the job
+}//unit job
+
 //------------------------------------------------------------- build stickers
 $stickers   = array();    //flat list of labels to print
 $skipped    = array();    //items that have no printable barcode value
@@ -152,27 +239,18 @@ foreach ($job['items'] as $item) {
     $product = $products[$item['id']];
     $barcode = trim($product['Barcode']);
 
-    if ($barcode === '') {
+    /*
+     * A unit job carries one code per unit; everything else prints the product's
+     * own code as many times as was asked for.
+     */
+    $codes = isset($unit_codes[$item['id']])
+        ? $unit_codes[$item['id']]
+        : array_fill(0, max(1, (int) $item['qty']), $barcode);
+
+    if ($barcode === '' && empty($unit_codes[$item['id']])) {
         $skipped[] = $product['ItemName'];
         continue;
     }//no barcode on the product
-
-    $svg = '';
-
-    if ($options['show_bars']) {
-        $cache_key = $barcode . '|' . $options['symbology'] . '|' . $options['bar_color'];
-
-        if (!isset($svg_cache[$cache_key])) {
-            $svg_cache[$cache_key] = bcRenderBarcodeSvg($barcode, $options['symbology'], $options['bar_color']);
-        }//render once
-
-        $svg = $svg_cache[$cache_key];
-
-        if ($svg === '') {
-            $skipped[] = $product['ItemName'];
-            continue;
-        }//not encodable
-    }//bars wanted
 
     //------------------------------------------------------ the text lines
     $name = (string) $product['ItemName'];
@@ -185,29 +263,47 @@ foreach ($job['items'] as $item) {
 
     $category_line = trim($product['CategoryName'] . ' / ' . $product['SubCatName'], ' /');
 
-    $sticker = array(
-        'name'     => $name,
-        'second'   => (string) $product['SecondName'],
-        'category' => $category_line,
-        'sku'      => (string) $product['ProductNo'],
-        'barcode'  => $barcode,
-        'batch'    => (string) $item['batch'],
-        'price'    => $item['price'],
-        'svg'      => $svg,
-    );
+    foreach ($codes as $code) {
 
-    //copies multiplies whatever quantity was typed for the row
-    $wanted = $item['qty'] * $options['copies'];
+        $svg = '';
 
-    for ($i = 0; $i < $wanted; $i++) {
+        if ($options['show_bars']) {
+            $cache_key = $code . '|' . $options['symbology'] . '|' . $options['bar_color'];
 
-        if (count($stickers) >= $max_labels) {
-            $was_capped = true;
-            break 2;
-        }//job ceiling reached
+            if (!isset($svg_cache[$cache_key])) {
+                $svg_cache[$cache_key] = bcRenderBarcodeSvg($code, $options['symbology'], $options['bar_color']);
+            }//render once per code
 
-        $stickers[] = $sticker;
-    }//copies
+            $svg = $svg_cache[$cache_key];
+
+            if ($svg === '') {
+                $skipped[] = $product['ItemName'];
+                continue;
+            }//not encodable
+        }//bars wanted
+
+        $sticker = array(
+            'name'     => $name,
+            'second'   => (string) $product['SecondName'],
+            'category' => $category_line,
+            'sku'      => (string) $product['ProductNo'],
+            'barcode'  => $code,
+            'batch'    => (string) $item['batch'],
+            'price'    => $item['price'],
+            'svg'      => $svg,
+        );
+
+        //copies repeats each sticker; a unit is one sticker unless copies says otherwise
+        for ($i = 0; $i < $options['copies']; $i++) {
+
+            if (count($stickers) >= $max_labels) {
+                $was_capped = true;
+                break 3;
+            }//job ceiling reached
+
+            $stickers[] = $sticker;
+        }//copies
+    }//each code
 }//foreach item
 
 /*

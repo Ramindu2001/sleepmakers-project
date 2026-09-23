@@ -55,6 +55,12 @@ final class TransferScanTest extends DatabaseTestCase
         return str_repeat($code . "\n", $times);
     }
 
+    //a sticker from a unit counts for its product, on both sides of a transfer
+    private function unitCodes($product_id, $qty)
+    {
+        return (new ProductUnits())->allocate($this->warehouse, $product_id, "2025-09-12", $qty, $this->alice)["codes"];
+    }
+
     // ---- sending ---------------------------------------------------------------------------
 
     public function test_send_takes_the_oldest_stock_first_and_splits_across_batches()
@@ -235,5 +241,48 @@ final class TransferScanTest extends DatabaseTestCase
                 $this->assertSame($status, $e->status);
             }
         }
+    }
+
+    // ---- unit stickers ----------------------------------------------------------------------
+
+    public function test_picking_a_transfer_by_scanning_unit_stickers()
+    {
+        $codes = $this->unitCodes($this->bed, 3);
+
+        $lines = $this->lines($this->scan->sendPreview($this->transfer, $this->warehouse, $this->alice, implode("\n", $codes)));
+
+        $this->assertSame(3, $lines['COO00001']['qty']);
+        $this->assertSame('ok', $lines['COO00001']['status']);
+    }
+
+    public function test_checking_what_arrived_by_scanning_unit_stickers()
+    {
+        $this->sent();
+        $codes = $this->unitCodes($this->bed, 7);
+
+        $lines = $this->lines($this->scan->receivePreview($this->transfer, $this->showroom, $this->bob, implode("\n", $codes)));
+
+        $this->assertSame([7, 7, 7], [$lines['COO00001']['sent'], $lines['COO00001']['qty'], $lines['COO00001']['received']]);
+        $this->assertSame('Match', $lines['COO00001']['message']);
+    }
+
+    public function test_the_same_unit_sticker_read_twice_is_still_one_item()
+    {
+        $this->sent();
+        $codes = $this->unitCodes($this->bed, 2);
+
+        $lines = $this->lines($this->scan->receivePreview($this->transfer, $this->showroom, $this->bob,
+            implode("\n", array_merge($codes, [$codes[0]]))));
+
+        $this->assertSame(2, $lines['COO00001']['qty']);
+    }
+
+    public function test_a_code_that_is_not_a_unit_we_printed_is_still_not_on_the_transfer()
+    {
+        $this->sent();
+
+        $lines = $this->lines($this->scan->receivePreview($this->transfer, $this->showroom, $this->bob, 'COO0000125099999'));
+
+        $this->assertSame('Not on this transfer', $lines['COO0000125099999']['message']);
     }
 }

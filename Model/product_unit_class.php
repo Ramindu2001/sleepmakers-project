@@ -14,6 +14,11 @@
 //Nothing here changes stock: a unit is recorded when it is PRINTED and marked RECEIVED when
 //it is scanned into a GRN. The unique key on UnitBarcode is what makes the same unit
 //impossible to register twice.
+
+//the serials come from the barcode module's counter, and not every page that prints labels
+//loads the generator, so the model asks for what it needs itself
+require_once __DIR__ . '/barcode_settings_class.php';
+
 class ProductUnits extends Dbh
 {
     const PRINTED = 1;
@@ -75,13 +80,25 @@ class ProductUnits extends Dbh
         return $settings['mode'];
     }//mode on
 
-    //the part of a unit code that follows the item barcode, e.g. "25090013" - always the same
-    //width, which is what lets codes typed with no separator between them be split apart
+    //The part of a unit code that follows the item barcode, e.g. "25090013" - always the same
+    //width, which is what lets codes typed with no separator between them be split apart.
+    //0 where the shop does not number its units, so nothing about scanning changes there.
     public function suffixLength($shop_id)
     {
         $settings = $this->settings($shop_id);
+        if(!$settings['mode'])
+        {
+            return 0;
+        }//not printing unit barcodes
         return strlen($this->build($settings, 'X', date('Y-m-d'), 1)) - 1;
     }//suffix length
+
+    //what a unit code looks like under this shop's rules, for the settings page
+    public function sample($shop_id, $item_barcode = 'COO00001', $produced_date = null)
+    {
+        $date = self::validDate($produced_date);
+        return $this->build($this->settings($shop_id), $item_barcode, $date === null ? date('Y-m-d') : $date, 1);
+    }//sample
 
     //the code for one unit: the pattern with the item, the date and the serial filled in
     private function build(array $settings, $item_barcode, $produced_date, $seq)
@@ -175,6 +192,48 @@ class ProductUnits extends Dbh
         }
     }//allocate
 
+    //One print job over several products: [product id => how many], all under one reference
+    //and in one transaction, so a job either numbers everything or nothing.
+    //Returns ['print_ref' => 'UP_000001', 'counts' => [product id => how many]].
+    public function allocateBatch($shop_id, array $quantities, $produced_date, $user_id)
+    {
+        $pdo = $this->connect();
+        $own = !$pdo->inTransaction();
+        if($own)
+        {
+            $pdo->beginTransaction();
+        }
+
+        try
+        {
+            $ref = $this->nextPrintRef($shop_id);
+            $counts = [];
+            foreach($quantities as $product_id => $qty)
+            {
+                $batch = $this->allocate($shop_id, $product_id, $produced_date, $qty, $user_id, $ref);
+                $counts[(int)$product_id] = count($batch['codes']);
+            }//each product
+            if(empty($counts))
+            {
+                throw new UnitBarcodeRefused(422, 'Choose at least one product to number.');
+            }
+
+            if($own)
+            {
+                $pdo->commit();
+            }
+            return ['print_ref' => $ref, 'counts' => $counts];
+        }
+        catch(Throwable $e)
+        {
+            if($own && $pdo->inTransaction())
+            {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }//allocate batch
+
     //the next print job reference for this shop (UP_000001, UP_000002, ...)
     public function nextPrintRef($shop_id)
     {
@@ -185,6 +244,30 @@ class ProductUnits extends Dbh
         $number = ($last === false) ? 0 : (int)substr((string)$last, 3);
         return 'UP_' . str_pad((string)($number + 1), 6, '0', STR_PAD_LEFT);
     }//next print ref
+
+    //the last print jobs of a shop, newest first: [['print_ref', 'printed_at', 'units', 'items']]
+    public function printJobs($shop_id, $limit = 25)
+    {
+        $limit = max(1, min(200, (int)$limit));
+        $stmt = $this->connect()->prepare("SELECT productunits.PrintRef, MIN(productunits.PrintedAt) AS PrintedAt,
+            COUNT(*) AS Units, GROUP_CONCAT(DISTINCT COALESCE(products.ItemName, '') ORDER BY products.ItemName SEPARATOR ', ') AS Items
+            FROM productunits
+            LEFT JOIN products ON products.PDID = productunits.products_PDID
+            WHERE productunits.shop_SHID = ?
+            GROUP BY productunits.PrintRef
+            ORDER BY MIN(productunits.PUID) DESC
+            LIMIT " . $limit . ";");
+        $stmt->execute([(int)$shop_id]);
+
+        return array_map(function($row) {
+            return [
+                'print_ref' => $row['PrintRef'],
+                'printed_at' => $row['PrintedAt'],
+                'units' => (int)$row['Units'],
+                'items' => (string)$row['Items'],
+            ];
+        }, $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }//print jobs
 
     //the units of one print job, oldest first
     public function forPrintRef($shop_id, $print_ref)

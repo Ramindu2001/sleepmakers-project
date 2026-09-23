@@ -112,6 +112,45 @@ class BarcodeSettings extends Dbh
         }//catch
     }//saveSettings
 
+    /**
+     * The rules for a unique barcode on every unit (db/UNIT_BARCODES_MODULE.md).
+     *
+     * Saved on its own so the two forms never overwrite each other: the product
+     * rules keep the unit rules, and this keeps the product rules. A row created
+     * here starts on the table's own defaults for everything else.
+     */
+    public function saveUnitSettings($shop_id, array $data, $user_id)
+    {
+        try {
+            $sql = "INSERT INTO `barcodesettings`
+                        (`shop_SHID`, `UnitMode`, `UnitPattern`, `UnitSeqLength`, `UnitSeparator`,
+                         `UpdatedDate`, `UpdateUserID`)
+                    VALUES (?,?,?,?,?,NOW(),?)
+                    ON DUPLICATE KEY UPDATE
+                        `UnitMode`      = VALUES(`UnitMode`),
+                        `UnitPattern`   = VALUES(`UnitPattern`),
+                        `UnitSeqLength` = VALUES(`UnitSeqLength`),
+                        `UnitSeparator` = VALUES(`UnitSeparator`),
+                        `UpdatedDate`   = NOW(),
+                        `UpdateUserID`  = VALUES(`UpdateUserID`);";
+
+            $stmt = $this->connect()->prepare($sql);
+            $stmt->execute(array(
+                (int) $shop_id,
+                empty($data['UnitMode']) ? 0 : 1,
+                (string) $data['UnitPattern'],
+                (int) $data['UnitSeqLength'],
+                (string) $data['UnitSeparator'],
+                (int) $user_id,
+            ));
+
+            return true;
+        }//try
+        catch (PDOException $e) {
+            return false;
+        }//catch
+    }//saveUnitSettings
+
     //=========================================================== sequences ===
 
     /**

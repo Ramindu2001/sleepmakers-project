@@ -288,6 +288,10 @@ class E2EFixtures
         //ticks belong to a role in a shop, so both an e2e role and an e2e shop take theirs with them
         $this->pdo->exec("DELETE FROM userroleaccess WHERE UserRolls_URID IN ($roles) OR shop_SHID IN ($shops)");
         $this->pdo->exec("DELETE FROM usermoduleaccess WHERE UserRoles_URID IN ($roles) OR shop_SHID IN ($shops)");
+        //the units and the barcode rules of an e2e shop
+        $this->pdo->exec("DELETE FROM productunits WHERE shop_SHID IN ($shops)");
+        $this->pdo->exec("DELETE FROM barcodesettings WHERE shop_SHID IN ($shops)");
+        $this->pdo->exec("DELETE FROM barcodesequence WHERE shop_SHID IN ($shops)");
         $this->pdo->exec("DELETE FROM user WHERE UserName LIKE 'e2e\\_%'");
         $this->pdo->exec("DELETE FROM userroles WHERE UserRoleName LIKE 'e2e %'");
         $this->pdo->exec("DELETE FROM shop WHERE ShopName LIKE 'e2e %'");

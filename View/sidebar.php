@@ -294,6 +294,15 @@ if ($userType != 1) {
                   <span class="hide-menu">Barcode Settings</span>
                 </a>
               </li>
+              <!-- what was made, and the codes on those units (db/UNIT_BARCODES_MODULE.md) -->
+              <li class="sidebar-item">
+                <a href="../Public/unit-barcodes.php" class="sidebar-link sidebar-link5">
+                  <div class="round-16 d-flex align-items-center justify-content-center">
+                    <i class="ti ti-circle"></i>
+                  </div>
+                  <span class="hide-menu">Unit Barcodes</span>
+                </a>
+              </li>
               <li class="sidebar-item">
                 <a href="javascript:void(0)" class="sidebar-link has-arrow sidebar-link2">
                   <div class="round-16 d-flex align-items-center justify-content-center">
@@ -1521,6 +1530,15 @@ if ($userType != 1) {
                     <i class="ti ti-circle"></i>
                   </div>
                   <span class="hide-menu">Barcode Settings</span>
+                </a>
+              </li>
+              <!-- what was made, and the codes on those units (db/UNIT_BARCODES_MODULE.md) -->
+              <li class="sidebar-item">
+                <a href="../Public/unit-barcodes.php" class="sidebar-link sidebar-link4">
+                  <div class="round-16 d-flex align-items-center justify-content-center">
+                    <i class="ti ti-circle"></i>
+                  </div>
+                  <span class="hide-menu">Unit Barcodes</span>
                 </a>
               </li>
             <?php
