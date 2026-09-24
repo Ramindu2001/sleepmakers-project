@@ -36,6 +36,10 @@ $pdo->prepare("INSERT INTO pricehistory (ProductID, VariationID, EffectiveDate, 
     BatchID, Inventory_INID) VALUES (?, 0, CURDATE(), 200, 350, 350, 'E2ESH1', ?)")->execute([$sheetHere, $sheetInv]);
 
 $bedThere = $stock->products['bed'];
+//the showroom keeps its own pillows, and a lamp the warehouse has never held
+$pillowThere = $stock->products['pillow'];
+$pillowHere = $stock->products['pillow_shop'];
+$lampHere = $stock->products['lamp_shop'];
 
 //the cart fields a gui-pos cash sale posts, with the warehouse columns beside them
 function sale(array $lines, array $header = [])
@@ -47,7 +51,8 @@ function sale(array $lines, array $header = [])
         'detail' => '', 'item_id' => [], 'Item_name' => [], 'productType' => [], 'qty' => [],
         'original_rate' => [], 'rate' => [], 'discountType' => [], 'Original_discounttype' => [],
         'discount' => [], 'original_discount' => [], 'totals' => [], 'original_total' => [],
-        'wh_line' => [], 'wh_custom' => [], 'wh_supplier_product' => [], 'wh_notes' => []];
+        'wh_line' => [], 'wh_custom' => [], 'wh_own' => [], 'wh_supplier_product' => [],
+        'wh_notes' => []];
     $gross = 0;
     foreach ($lines as $line) {
         $total = $line['qty'] * $line['price'];
@@ -66,6 +71,7 @@ function sale(array $lines, array $header = [])
         $fields['original_total'][] = $total;
         $fields['wh_line'][] = empty($line['warehouse']) ? '' : '1';
         $fields['wh_custom'][] = empty($line['custom']) ? '' : '1';
+        $fields['wh_own'][] = empty($line['own']) ? '' : '1';
         $fields['wh_supplier_product'][] = isset($line['supplier']) ? $line['supplier'] : '';
         $fields['wh_notes'][] = isset($line['notes']) ? $line['notes'] : '';
     }//each cart line
@@ -245,6 +251,58 @@ try {
 
     $b->get('Public/customer-order.php?id=' . $orderId);
     checkClean('the finished job sheet', $b);
+
+    // ---- the checkbox in front of an item name ------------------------------------------------
+    echo "\nTicking an item off the shop's own shelf\n";
+    $b->dropSession();
+    signIn($b, 'e2e_admin', $pw);
+    shopLogin($b, $S, 'e2e_admin', $pw);
+
+    $delivery = ['wh_supplier_shop' => $W, 'wh_cust_name' => 'e2e Kamala', 'wh_cust_phone' => '0777654321',
+        'wh_cust_address' => '4 Temple Lane', 'wh_deliver_to' => 1, 'wh_address' => '4 Temple Lane',
+        'wh_phone' => '0777654321', 'wh_note' => ''];
+    $shelf = function ($product) use ($pdo) {
+        return (float) one($pdo, "SELECT COALESCE(SUM(CurrentQty), 0) FROM inventory WHERE products_PDID = ?", [$product]);
+    };
+
+    $invoicesBefore = (int) one($pdo, "SELECT COUNT(*) FROM invoiceheader WHERE shop_SHID = ?", [$S]);
+    $b->post('Controller/guiPosController.php?cash=1', sale([
+        ['product' => $lampHere, 'name' => 'e2e Lamp', 'qty' => 1, 'price' => 200,
+            'warehouse' => 1, 'own' => 1],
+    ], $delivery));
+    check('ticking something the warehouse never had is refused',
+        strpos($b->body, 'does not keep that item') !== false
+        && (int) one($pdo, "SELECT COUNT(*) FROM invoiceheader WHERE shop_SHID = ?", [$S]) === $invoicesBefore, $b);
+    check('and the lamp is still on the shelf', $shelf($lampHere) === 3.0);
+
+    //a cart that billed a pillow but named the bed: the posted product must count for nothing
+    $b->post('Controller/guiPosController.php?cash=1', sale([
+        ['product' => $pillowHere, 'name' => 'e2e Pillow', 'qty' => 2, 'price' => 750,
+            'warehouse' => 1, 'own' => 1, 'supplier' => $bedThere, 'notes' => 'Soft'],
+    ], $delivery));
+
+    $ticked = rows($pdo, "SELECT * FROM customerorders WHERE CustName = 'e2e Kamala' ORDER BY COID DESC LIMIT 1");
+    check('the ticked line left a warehouse order', count($ticked) === 1, $b);
+    if (count($ticked) !== 1) {
+        throw new RuntimeException('no ticked order to check');
+    }
+    $tickedLines = rows($pdo, "SELECT * FROM customerorderlines WHERE customerorders_COID = ?", [(int) $ticked[0]['COID']]);
+
+    check('it is the warehouse pillow that gets picked, not the bed the browser named',
+        count($tickedLines) === 1 && (int) $tickedLines[0]['SupplierProductID'] === $pillowThere, $b);
+    check('the invoice still bills the shop pillow',
+        (int) $tickedLines[0]['products_PDID'] === $pillowHere
+        && (int) one($pdo, "SELECT COUNT(*) FROM invoicedetails WHERE InvoiceHeader_IHID = ? AND products_PDID = ?",
+            [(int) $ticked[0]['InvoiceHeader_IHID'], $pillowHere]) === 1);
+    check('the line is Pending for the warehouse, not Given',
+        (int) $tickedLines[0]['LineStat'] === 2 && $tickedLines[0]['LineSource'] === 'WAREHOUSE');
+    check('the shop shelf was not touched: the warehouse is sending these', $shelf($pillowHere) === 4.0);
+    check('the warehouse pillows have not moved yet either', $shelf($pillowThere) === 6.0);
+    check('the order is Pending', (int) $ticked[0]['OrderStat'] === 1);
+
+    $b->get('Public/customer-orders.php');
+    check('the shop sees the ticked order on its own orders page', $b->has($ticked[0]['OrderNo']), $b);
+    checkClean('the shop orders page after a ticked line', $b);
 } finally {
     //the orders and dispatches go before the users and shops they point at
     $pdo->exec("DELETE dl FROM orderdispatchlines dl INNER JOIN orderdispatches d ON d.DSID = dl.orderdispatches_DSID

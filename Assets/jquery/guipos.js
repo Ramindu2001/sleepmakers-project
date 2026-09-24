@@ -525,14 +525,18 @@ function addToCart(product, inventory, discountType, discount) {
     trCount=trCount+1;
     subtotal = parseFloat(subtotal).toFixed(2);
     sellingPrice = parseFloat(sellingPrice).toFixed(2);
+    // only a stock item can be sent from the warehouse: a service has nothing to dispatch
+    var whPick = (product.ItemType == "P");
     let html = `
         <tr id="productid-${PDID}-${sellingPrice.replace(/\./g, '_')}" class="cartItem${trCount}" data-product="${PDID}">
             <td>
+                ${whPick ? '<label class="form-check wh-pick d-block mb-1 f10 lh-1"><input class="form-check-input wh-toggle" type="checkbox"> Will be delivered by Warehouse</label>' : ""}
                 <textarea class="form-control border-none p5 f10 Item_name" name="Item_name[]">${product.Barcode} - ${product.ItemName} - Rs.${sellingPrice}</textarea>
                 <input type="hidden" name="item_id[]" id="item-cartItem${trCount}" value="${PDID}">
                 <input type="hidden" name="productType[]" id="productType-cartItem${trCount}" value="${product.ItemType}">
                 <input type="hidden" name="wh_line[]" class="wh_line" value="">
                 <input type="hidden" name="wh_custom[]" class="wh_custom" value="">
+                <input type="hidden" name="wh_own[]" class="wh_own" value="">
                 <input type="hidden" name="wh_supplier_product[]" class="wh_supplier_product" value="">
                 <input type="hidden" name="wh_notes[]" class="wh_notes" value="">
             </td>
@@ -882,6 +886,8 @@ function holdInvoiceAddtoCart(HoldID) {
                     var sellingPrice = item.SellingPrice || 0;
                     var Item_Name = item.Item_Name || "";
                     var ItemType = item.ItemType || 0;
+                    // a held bill stores the type as a number: 1 is a stock item
+                    var whPick = (ItemType == "P" || ItemType == 1);
                     var qty = item.SellQty || 0;
                     var totalQty = item.totalQty || 0;
                     var UnitPrice = item.UnitPrice || 0;
@@ -915,11 +921,13 @@ function holdInvoiceAddtoCart(HoldID) {
                     html += `
                         <tr id="productid-${PDID}-${sellingPrice.toString().replace(/\./g, '_')}" class="cartItem${trCount}" data-product="${PDID}">
                             <td>
+                                ${whPick ? '<label class="form-check wh-pick d-block mb-1 f10 lh-1"><input class="form-check-input wh-toggle" type="checkbox"> Will be delivered by Warehouse</label>' : ""}
                                 <textarea class="form-control border-none p5 f10 Item_name" name="Item_name[]">${Item_Name} - Rs.${UnitPrice}</textarea>
                                 <input type="hidden" name="item_id[]" id="item-cartItem${trCount}" value="${PDID}">
                                 <input type="hidden" name="productType[]" id="productType-cartItem${trCount}" value="${ItemType}">
                                 <input type="hidden" name="wh_line[]" class="wh_line" value="">
                                 <input type="hidden" name="wh_custom[]" class="wh_custom" value="">
+                                <input type="hidden" name="wh_own[]" class="wh_own" value="">
                                 <input type="hidden" name="wh_supplier_product[]" class="wh_supplier_product" value="">
                                 <input type="hidden" name="wh_notes[]" class="wh_notes" value="">
                             </td>

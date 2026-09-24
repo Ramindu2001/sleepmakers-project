@@ -388,6 +388,16 @@ class E2EStock
         $this->inventory['bed2'] = $this->stock('bed', 5, 'E2EB2', 950, 1450);
         $this->inventory['sheet'] = $this->stock('sheet', 10, 'E2ES1', 200, 350);
 
+        //the e2e tills bill without a cash counter, so a sale never stops to ask for one
+        $this->pdo->prepare("UPDATE shop SET is_counter = 0 WHERE SHID IN (?, ?)")->execute([$W, $S]);
+
+        //A pillow both shops keep, and a lamp only the showroom has. The checkbox in front of an
+        //item name can hand the pillow to the warehouse although the shop has its own; it can
+        //never hand over the lamp, because the warehouse has never held one.
+        $this->products['pillow'] = $this->shopProduct($W, 'E2EPIL01', 'e2e Pillow', 400, 750, 6, 'E2EPW1');
+        $this->products['pillow_shop'] = $this->shopProduct($S, 'E2EPIL01', 'e2e Pillow', 400, 750, 4, 'E2EPL1');
+        $this->products['lamp_shop'] = $this->shopProduct($S, 'E2ELMP01', 'e2e Lamp', 100, 200, 3, 'E2ELM1');
+
         $this->grn['open'] = $this->grn($W, 0);
         $this->grn['verified'] = $this->grn($W, 2);
         $this->grn['showroom'] = $this->grn($S, 0);
@@ -409,6 +419,23 @@ class E2EStock
         return $id;
     }
 
+    //one product of a named shop, with stock of its own: the shops keep separate copies
+    private function shopProduct($shop, $barcode, $name, $purchase, $selling, $qty, $batch)
+    {
+        $this->pdo->prepare("INSERT INTO products (Barcode, ItemName, ProdPurchasePrice, ProdSellPrice, ProductStat,
+            ItemType, user_USID, Subcategories_SCID, shop_SHID, PurchaseUnit, UnitConversion, SellingUnit, prodFlatDiscount)
+            VALUES (?, ?, ?, ?, 1, 'P', ?, 1, ?, 1, 1, 1, 0)")
+            ->execute([$barcode, $name, $purchase, $selling, $this->fx->users['admin'], $shop]);
+        $product = (int) $this->pdo->lastInsertId();
+        $this->pdo->prepare("INSERT INTO inventory (CurrentQty, BillQty, ReturnQty, TransferInQty, TransferOutQty,
+            products_PDID, shop_SHID, RackID, BatchID) VALUES (?, 0, 0, 0, 0, ?, ?, 1, ?)")
+            ->execute([$qty, $product, $shop, $batch]);
+        $inventory = (int) $this->pdo->lastInsertId();
+        $this->pdo->prepare("INSERT INTO pricehistory (ProductID, VariationID, EffectiveDate, PurchasePrice, SellingPrice,
+            labelPrice, BatchID, Inventory_INID) VALUES (?, 0, CURDATE(), ?, ?, ?, ?, ?)")
+            ->execute([$product, $purchase, $selling, $selling, $batch, $inventory]);
+        return $product;
+    }
     private function grn($shop, $stat)
     {
         $this->pdo->prepare("INSERT INTO grnheader (GRNHeaderNo, EffectiveDate, InvoiceNo, ItemCount, TotalPurchasePrice, TotalSellPrice,

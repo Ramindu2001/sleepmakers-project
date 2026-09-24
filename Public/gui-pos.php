@@ -425,8 +425,8 @@ $supplierShopId = $supplierShop === null ? 0 : (int)$supplierShop["SHID"];
     <script src="../Assets/libs/bootstrap/dist/js/bootstrap.bundle.js"></script>
     <script src="../Assets/libs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../Assets/js/sidebarmenu.js"></script>
-    <script src="../Assets/jquery/guipos.js?v=20260924"></script>
-    <script src="../Assets/jquery/pos_warehouse_order.js?v=20260924"></script>
+    <script src="../Assets/jquery/guipos.js?v=20260924b"></script>
+    <script src="../Assets/jquery/pos_warehouse_order.js?v=20260924b"></script>
     <script src="../Assets/jquery/daily-sales.js"></script>
     <script src="../Assets/js/app.min.js"></script>
     <script src="../Assets/libs/simplebar/dist/simplebar.js"></script>
