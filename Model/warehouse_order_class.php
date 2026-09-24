@@ -35,7 +35,7 @@ class WarehouseOrder extends Dbh
     const MAX_LINES = 100;
 
     const ORDER_SELECT = "SELECT co.*, s.ShopName AS ShopName, sup.ShopName AS SupplierName,
-        ih.InvoiceNo, ih.NetAmount, ih.CustPayment, ih.CustBalance, ih.InvStat
+        COALESCE(NULLIF(ih.InvoiceNo, ''), ih.BillNo) AS InvoiceNo, ih.NetAmount, ih.CustPayment, ih.CustBalance, ih.InvStat
         FROM customerorders co
         INNER JOIN shop s ON s.SHID = co.shop_SHID
         INNER JOIN shop sup ON sup.SHID = co.SupplierShopID

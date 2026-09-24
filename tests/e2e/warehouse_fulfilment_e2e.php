@@ -164,6 +164,10 @@ try {
 
     $b->get('Public/customer-orders.php');
     check('the shop sees it on its own orders page', $b->has($order['OrderNo']), $b);
+    //this POS leaves InvoiceNo empty: the number the customer quotes back is BillNo
+    $billNo = (string) one($pdo, "SELECT BillNo FROM invoiceheader WHERE IHID = ?",
+        [(int) $order['InvoiceHeader_IHID']]);
+    check('and which bill it was paid on (' . $billNo . ')', $billNo !== '' && $b->has($billNo), $b);
     checkClean('the shop orders page', $b);
 
     // ---- the warehouse ------------------------------------------------------------------------

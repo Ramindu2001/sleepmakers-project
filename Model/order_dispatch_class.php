@@ -406,7 +406,7 @@ class OrderDispatch extends Dbh
     public function find($dispatch_id, $shop_id)
     {
         $stmt = $this->connect()->prepare("SELECT d.*, co.OrderNo, co.shop_SHID AS OrderShopID, co.SupplierShopID,
-            co.CustName, co.InvoiceHeader_IHID, ih.InvoiceNo, ih.InvStat, ih.CustBalance
+            co.CustName, co.InvoiceHeader_IHID, COALESCE(NULLIF(ih.InvoiceNo, ''), ih.BillNo) AS InvoiceNo, ih.InvStat, ih.CustBalance
             FROM orderdispatches d
             INNER JOIN customerorders co ON co.COID = d.customerorders_COID
             LEFT JOIN invoiceheader ih ON ih.IHID = co.InvoiceHeader_IHID

@@ -444,6 +444,37 @@ final class WarehouseOrderTest extends DatabaseTestCase
         $this->assertSame([$this->bedThere], array_map('intval', array_column($found, 'PDID')));
     }//found by barcode
 
+    // ---- the number the customer sees on the bill ---------------------------------------------
+
+    public function test_an_order_shows_the_bill_number_the_till_printed()
+    {
+        //POS leaves InvoiceNo empty and writes the number the cashier reads out into BillNo
+        $order = $this->order(null, ['invoice_id' => $this->invoice(['InvoiceNo' => '', 'BillNo' => 'ARL-000006'])]);
+
+        $found = $this->orders->get($order['order_id'], $this->shop, $this->cashier);
+
+        $this->assertSame('ARL-000006', $found['order']['InvoiceNo']);
+    }//the warehouse can find the bill
+
+    public function test_the_queue_shows_the_bill_number_too()
+    {
+        $this->order(null, ['invoice_id' => $this->invoice(['InvoiceNo' => '', 'BillNo' => 'ARL-000007'])]);
+
+        $rows = $this->orders->listFor($this->warehouse, $this->picker, 'incoming');
+
+        $this->assertSame(['ARL-000007'], array_column($rows, 'InvoiceNo'));
+    }//and so does the queue
+
+    public function test_a_real_invoice_number_still_wins()
+    {
+        //wholesale invoices do fill InvoiceNo in; that is the one to show
+        $order = $this->order(null, ['invoice_id' => $this->invoice(['InvoiceNo' => 'WS-000012', 'BillNo' => 'ARL-000008'])]);
+
+        $found = $this->orders->get($order['order_id'], $this->shop, $this->cashier);
+
+        $this->assertSame('WS-000012', $found['order']['InvoiceNo']);
+    }//InvoiceNo when there is one
+
     // ---- ticking "deliver from warehouse" on the shop's own line ------------------------------
 
     public function test_the_warehouse_copy_of_a_shop_product_is_found()
