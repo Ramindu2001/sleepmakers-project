@@ -141,6 +141,30 @@ class WarehouseOrder extends Dbh
         return $row;
     }//supplier barcode
 
+    //One warehouse product by its id, for the POS tile the cashier just clicked.
+    public function supplierProduct($shop_id, $product_id)
+    {
+        $supplier = $this->supplierShop($shop_id);
+        if($supplier === null)
+        {
+            return null;
+        }
+        $stmt = $this->connect()->prepare("SELECT p.*, COALESCE(SUM(i.CurrentQty), 0) AS Available
+            FROM products p LEFT JOIN inventory i ON i.products_PDID = p.PDID AND i.shop_SHID = p.shop_SHID
+            WHERE p.PDID = ? AND p.shop_SHID = ? AND p.ProductStat = 1 AND p.ItemType = 'P'
+            GROUP BY p.PDID;");
+        $stmt->execute([(int)$product_id, (int)$supplier['SHID']]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if($row === false)
+        {
+            return null;
+        }
+        $row['SupplierShopID'] = (int)$supplier['SHID'];
+        $row['SupplierName'] = $supplier['ShopName'];
+        $row['from_warehouse'] = 1;
+        return $row;
+    }//supplier product
+
     //The shop's own copy of a warehouse product, created when it has none. The invoice line has
     //to point at a product of the shop that billed it, and a transfer would create exactly this
     //copy later - so the same helper makes it, and the two can never disagree.
@@ -196,6 +220,14 @@ class WarehouseOrder extends Dbh
     //delivery_phone, delivery_note, needed_by, notes, lines[]. Each line: source (GIVEN or
     //WAREHOUSE), product_id (the shop's own copy), supplier_product_id (the warehouse's),
     //description, qty, notes, unit_price.
+    //Would this sale leave a proper order? Checked before the invoice is written, so a sale that
+    //cannot be fulfilled is refused outright instead of taking the money and losing the goods.
+    public function checkSale($shop_id, array $sale)
+    {
+        $this->validate($shop_id, $sale);
+        return true;
+    }//check sale
+
     public function createFromSale($shop_id, $user_id, array $sale)
     {
         return $this->transaction(function() use ($shop_id, $user_id, $sale) {

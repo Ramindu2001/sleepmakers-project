@@ -4,6 +4,7 @@ session_start();
 include "../../Includes/config.php";
 include "../../Model/DB_Class.php";
 include "../../Includes/textile_helper.php";
+require_once "../../Includes/warehouse_fulfilment.php";
 $shop_id = $_SESSION['shop_id'];
 $dbObj = new DBTransactions();
 //shop data
@@ -389,6 +390,42 @@ else if(!isset($_GET["product_id"]) && (isset($_GET["subcat"]) || isset($_GET["v
         }
     }
     ?>
+    <?php
+    //Nothing of ours matched, or the shop simply does not carry it: offer the warehouse's own
+    //catalogue. These are billed now and delivered later, so an item with no stock still shows.
+    if(isset($_GET["value"]) && trim($_GET["value"]) !== "" && $offset == 0)
+    {
+        $warehouseRows = (new WarehouseOrder())->searchSupplier($shop_id, trim($_GET["value"]));
+        $alreadyShown = array();
+        foreach($productData2 as $shown)
+        {
+            $alreadyShown[strtoupper(trim($shown["Barcode"]))] = true;
+        }//what this shop already offered
+        foreach($warehouseRows as $wh)
+        {
+            if(isset($alreadyShown[strtoupper(trim($wh["Barcode"]))]))
+            {
+                continue;
+            }//the shop has its own, so it is already on the screen
+            $procount++;
+            ?>
+            <a href="javascript:void(0)" class="col-md-3 product mb-2 warehouse-product" data-warehouse="1" data-supplier-product="<?=(int)$wh["PDID"]?>">
+                <div class="card product-card position-relative border-warning">
+                    <div class="d-none">
+                        <input type="hidden" id="productid" value="<?=(int)$wh["PDID"]?>">
+                    </div>
+                    <span class="qty-badge bg-warning text-dark">Order</span>
+                    <div class="product-name-tile">
+                        <span class="product-name-text"><?=htmlspecialchars($wh["ItemName"])?></span>
+                        <span class="product-name-price">Rs. <?=$wh["ProdSellPrice"]?></span>
+                        <span class="badge bg-warning text-dark d-block mt-1">Delivered from <?=htmlspecialchars($wh["SupplierName"])?></span>
+                    </div>
+                </div>
+            </a>
+            <?php
+        }//each warehouse item the shop could order
+    }//the warehouse catalogue
+    ?>
     <?php if(($offset + $limit) < $totalProducts2): ?>
     <div class="col-12 lazy-load-sentinel" data-offset="<?=$offset + $limit?>" data-limit="<?=$limit?>" data-subcat="<?=isset($_GET['subcat']) ? htmlspecialchars($_GET['subcat']) : ''?>" data-value="<?=isset($_GET['value']) ? htmlspecialchars($_GET['value']) : ''?>" style="height:1px;"></div>
     <?php endif; ?>
@@ -398,6 +435,41 @@ else if(!isset($_GET["product_id"]) && (isset($_GET["subcat"]) || isset($_GET["v
     <?php
 }
 elseif (isset($_GET["product_id"])) {
+    //A product the warehouse holds, not this shop. It is billed now and delivered later, so it
+    //has no stock here and no batch price - the warehouse's own selling price is what the
+    //customer pays, and the quantity is not capped by a shelf.
+    if(isset($_GET["warehouse"]))
+    {
+        $wh = (new WarehouseOrder())->supplierProduct($shop_id, $_GET["product_id"]);
+        if($wh === null)
+        {
+            returnError("00005", "That item is not available to order");
+        }
+        if((float)$wh["UnitConversion"] <= 0)
+        {
+            $wh["UnitConversion"] = 1.000;
+        }
+        echo json_encode([
+            "product" => $wh,
+            "discountType" => 1,
+            "discount" => 0,
+            "unitPrice" => $wh["ProdSellPrice"],
+            "cost" => $wh["ProdPurchasePrice"],
+            "warehouse" => 1,
+            "supplier_product_id" => (int)$wh["PDID"],
+            "supplier_name" => $wh["SupplierName"],
+            "supplier_shop_id" => (int)$wh["SupplierShopID"],
+            "inventory" => [[
+                "INID" => 0,
+                "BatchID" => "",
+                "SellingPrice" => $wh["ProdSellPrice"],
+                "PurchasePrice" => $wh["ProdPurchasePrice"],
+                "TotalCurrentQty" => 99999,
+            ]],
+        ]);
+        exit;
+    }//a warehouse item
+
 
     $product_id = $_GET["product_id"];
     $shopie = 0;

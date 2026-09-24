@@ -531,6 +531,10 @@ function addToCart(product, inventory, discountType, discount) {
                 <textarea class="form-control border-none p5 f10 Item_name" name="Item_name[]">${product.Barcode} - ${product.ItemName} - Rs.${sellingPrice}</textarea>
                 <input type="hidden" name="item_id[]" id="item-cartItem${trCount}" value="${PDID}">
                 <input type="hidden" name="productType[]" id="productType-cartItem${trCount}" value="${product.ItemType}">
+                <input type="hidden" name="wh_line[]" class="wh_line" value="">
+                <input type="hidden" name="wh_custom[]" class="wh_custom" value="">
+                <input type="hidden" name="wh_supplier_product[]" class="wh_supplier_product" value="">
+                <input type="hidden" name="wh_notes[]" class="wh_notes" value="">
             </td>
             <td>
                 <div class="input-group">
@@ -914,6 +918,10 @@ function holdInvoiceAddtoCart(HoldID) {
                                 <textarea class="form-control border-none p5 f10 Item_name" name="Item_name[]">${Item_Name} - Rs.${UnitPrice}</textarea>
                                 <input type="hidden" name="item_id[]" id="item-cartItem${trCount}" value="${PDID}">
                                 <input type="hidden" name="productType[]" id="productType-cartItem${trCount}" value="${ItemType}">
+                                <input type="hidden" name="wh_line[]" class="wh_line" value="">
+                                <input type="hidden" name="wh_custom[]" class="wh_custom" value="">
+                                <input type="hidden" name="wh_supplier_product[]" class="wh_supplier_product" value="">
+                                <input type="hidden" name="wh_notes[]" class="wh_notes" value="">
                             </td>
                             <td>
                                 <div class="input-group">
@@ -1672,6 +1680,11 @@ $(document).ready(function(){
     });
     $("body").on("click", ".product", function () {
         var productid = $(this).find("#productid").val();
+        if ($(this).data("warehouse")) {
+            //the warehouse holds it, not us: billed now, delivered later
+            warehouseProduct(productid);
+            return;
+        }
         product(productid);
     });
     

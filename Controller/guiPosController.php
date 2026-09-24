@@ -2,6 +2,7 @@
 ini_set('display_errors', 0);
 include "../Includes/includes.php";
 include "../Includes/authcheck.php";
+include "../Includes/pos_warehouse_order.php";
 $guiObj=new guiPOS();
 $dbObj = new DBTransactions();
 $comObj = new Common();
@@ -40,7 +41,7 @@ if(isset($_GET["cash"]) || isset($_POST["cash"]))
             $totals = $_POST["totals"][$i];
             $original_total = $_POST["original_total"][$i];
             $productData=$guiObj->select_product($item_id);
-            if($productData[0]["ItemType"]=="P")
+            if($productData[0]["ItemType"]=="P" && empty($_POST["wh_line"][$i]))
             {
                 $inventoryData=$guiObj->getInventory($item_id,$original_rate, $shop_id, $company_id, $is_commonStock, $stockType, false, $is_expire);
                 if(count($inventoryData) > 0)
@@ -93,6 +94,17 @@ if(isset($_GET["cash"]) || isset($_POST["cash"]))
                     }
                     
                 }
+            }
+        }
+        //a sale that cannot leave a proper order for the warehouse is refused outright,
+        //so the money is never taken for goods nobody has been told to send
+        if(warehouseOrderWanted())
+        {
+            $whProblem = warehouseOrderCheck($shop_id, $user_USID);
+            if($whProblem !== "")
+            {
+                $alert["Error"][] = $whProblem;
+                $allow=false;
             }
         }
         if($shopObj->hascounter($shop_id)==1)
@@ -233,6 +245,12 @@ if(isset($_GET["cash"]) || isset($_POST["cash"]))
                 if(!empty($alert)) echo json_encode($alert);
                 exit;
             }
+            //the shop needs its own copy of every warehouse product before the invoice
+            //lines are written: an invoice line belongs to the shop that raised it
+            if(warehouseOrderWanted())
+            {
+                warehouseOrderPrepareCart($shop_id, $user_USID);
+            }
             $guiObj->update_docno(shop_id: $shop_id,org_no:$newws_no );
             $HIID=0;
             if(isset($_POST["HIID"]) && $_POST["HIID"]!=0 && !empty($_POST["HIID"]))
@@ -259,7 +277,7 @@ if(isset($_GET["cash"]) || isset($_POST["cash"]))
                 $totals = $_POST["totals"][$i];
                 $original_total = $_POST["original_total"][$i];
                 $productData=$guiObj->select_product($item_id);
-                if($productData[0]["ItemType"]=="P")
+                if($productData[0]["ItemType"]=="P" && empty($_POST["wh_line"][$i]))
                 {
                     $inventoryData=$guiObj->getInventory($item_id,$original_rate, $shop_id, $company_id, $is_commonStock, $stockType, false, $is_expire);
                     
@@ -494,12 +512,16 @@ if(isset($_GET["cash"]) || isset($_POST["cash"]))
                 }
                 else
                 {
-                    $inventoryDetails=$guiObj->setInvoiceDetails(sqllQty: $qty,unitPrice: $rate,sellAmount: $original_total,discount: $discount,totalDiscount: $discount,total: $totals,invoiceHeader: $invoice_IHID,pro_id: $item_id,discountType: $discountType,prodDes: $prodDes,shop_id: $shop_id, Item_Name: $Item_name,ItemType:2);
+                    $inventoryDetails=$guiObj->setInvoiceDetails(sqllQty: $qty,unitPrice: $rate,sellAmount: $original_total,discount: $discount,totalDiscount: $discount,total: $totals,invoiceHeader: $invoice_IHID,pro_id: $item_id,discountType: $discountType,prodDes: $prodDes,shop_id: $shop_id, Item_Name: $Item_name,ItemType:($productData[0]["ItemType"]=="P" ? 1 : 2));
 
                 }
 
                 
             }
+            if(warehouseOrderWanted())
+            {
+                warehouseOrderPlace($shop_id, $user_USID, $invoice_IHID, $alert);
+            }//what the warehouse now owes this customer
             $paymethod_PMID=1;
             $TransferAmount=$NetAmount;
             $sql="INSERT INTO `transactions`(`TransferAmount`, `paymethod_PMID`, `InvoiceHeader_IHID`, `returnheader_id`) VALUES ('$TransferAmount','$paymethod_PMID','$invoice_IHID','')";
@@ -551,6 +573,13 @@ if(isset($_GET["invoiceHold"]))
 {
     if(isset($_POST["item_id"]) && count($_POST["item_id"]) > 0)
     {
+        //a cart with warehouse items cannot be held: the order is part of the sale, and a
+        //held bill has nowhere to keep the customer and delivery details
+        if(warehouseOrderWanted())
+        {
+            echo json_encode(["Error" => ["An order with warehouse items cannot be held. Finish the sale, or take the warehouse items off the bill."]]);
+            exit;
+        }
         if(isset($_POST["InvoiceNo"]))
         {
             $InvoiceNo=$_POST["InvoiceNo"];
@@ -724,7 +753,7 @@ if(isset($_GET["btn_submit_invoice"]) || isset($_GET["btn_submit"]))
             $totals = $_POST["totals"][$i];
             $original_total = $_POST["original_total"][$i];
             $productData=$guiObj->select_product($item_id);
-            if($productData[0]["ItemType"]=="P")
+            if($productData[0]["ItemType"]=="P" && empty($_POST["wh_line"][$i]))
             {
                 $inventoryData=$guiObj->getInventory($item_id,$original_rate, $shop_id, $company_id, $is_commonStock, $stockType, false, $is_expire);
                 if(count($inventoryData) > 0)
@@ -797,6 +826,17 @@ if(isset($_GET["btn_submit_invoice"]) || isset($_GET["btn_submit"]))
             if(!isset($_POST["Amount"][$i]) || empty(isset($_POST["Amount"][$i])))
             {
                 $alert["Error"][]=" No Payment Amount <br>Error Code: #Inv-0015";
+                $allow=false;
+            }
+        }
+        //a sale that cannot leave a proper order for the warehouse is refused outright,
+        //so the money is never taken for goods nobody has been told to send
+        if(warehouseOrderWanted())
+        {
+            $whProblem = warehouseOrderCheck($shop_id, $user_USID);
+            if($whProblem !== "")
+            {
+                $alert["Error"][] = $whProblem;
                 $allow=false;
             }
         }
@@ -937,6 +977,12 @@ if(isset($_GET["btn_submit_invoice"]) || isset($_GET["btn_submit"]))
                 if(!empty($alert)) { header('Content-Type: application/json'); echo json_encode($alert); }
                 exit;
             }
+            //the shop needs its own copy of every warehouse product before the invoice
+            //lines are written: an invoice line belongs to the shop that raised it
+            if(warehouseOrderWanted())
+            {
+                warehouseOrderPrepareCart($shop_id, $user_USID);
+            }
             $guiObj->update_docno(shop_id: $shop_id,org_no:$newws_no );
             $HIID=0;
             if(isset($_POST["HIID"]) && $_POST["HIID"]!=0 && !empty($_POST["HIID"]))
@@ -964,7 +1010,7 @@ if(isset($_GET["btn_submit_invoice"]) || isset($_GET["btn_submit"]))
                 $totals = $_POST["totals"][$i];
                 $original_total = $_POST["original_total"][$i];
                 $productData=$guiObj->select_product($item_id);
-                if($productData[0]["ItemType"]=="P")
+                if($productData[0]["ItemType"]=="P" && empty($_POST["wh_line"][$i]))
                 {
                     $inventoryData=$guiObj->getInventory($item_id,$original_rate, $shop_id, $company_id, $is_commonStock, $stockType, false, $is_expire);
                     if(count($inventoryData) > 0)
@@ -1188,10 +1234,14 @@ if(isset($_GET["btn_submit_invoice"]) || isset($_GET["btn_submit"]))
                 }  
                 else
                 {
-                    $inventoryDetails=$guiObj->setInvoiceDetails(sqllQty: $qty,unitPrice: $rate,sellAmount: $original_total,discount: $discount,totalDiscount: $discount,total: $totals,invoiceHeader: $invoice_IHID,pro_id: $item_id,discountType: $discountType,prodDes: $prodDes,shop_id: $shop_id, Item_Name: $Item_name,ItemType:2);
+                    $inventoryDetails=$guiObj->setInvoiceDetails(sqllQty: $qty,unitPrice: $rate,sellAmount: $original_total,discount: $discount,totalDiscount: $discount,total: $totals,invoiceHeader: $invoice_IHID,pro_id: $item_id,discountType: $discountType,prodDes: $prodDes,shop_id: $shop_id, Item_Name: $Item_name,ItemType:($productData[0]["ItemType"]=="P" ? 1 : 2));
                 }              
             }
 
+            if(warehouseOrderWanted())
+            {
+                warehouseOrderPlace($shop_id, $user_USID, $invoice_IHID, $alert);
+            }//what the warehouse now owes this customer
             $totalAmountPaid=0;
             for ($i=0; $i <count($_POST["paymentType"]) ; $i++) 
             { 

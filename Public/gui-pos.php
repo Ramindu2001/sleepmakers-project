@@ -76,6 +76,10 @@ $salesmandata = $dbObj->getData($sql);
 
 $sql="SELECT * FROM customers WHERE CTID=1";
 $customerdata = $dbObj->getData($sql);
+require_once "../Includes/warehouse_fulfilment.php";
+//the shop this one can order from, so POS knows whether to offer warehouse items at all
+$supplierShop = (new WarehouseOrder())->supplierShop($shop_id);
+$supplierShopId = $supplierShop === null ? 0 : (int)$supplierShop["SHID"];
 ?>
 
 <!doctype html>
@@ -126,6 +130,7 @@ $customerdata = $dbObj->getData($sql);
         include "../View/modals/ShortcutListModal.php"; 
         include "../View/modals/productModal.php"; 
         include '../View/modals/add-customer-wholesale.php';
+        include '../View/modals/warehouse-order.php';
         include "../View/modals/add-products.php";
         include "../View/modals/daily-sale-modal.php";
         if($shopObj->hascounter($shop_id)==1)
@@ -255,6 +260,23 @@ $customerdata = $dbObj->getData($sql);
                                         </table>
                                     </div>
                                 </div>
+                                <?php if($supplierShopId > 0): ?>
+                                <div class="mb-2 text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-warning" data-bs-toggle="modal" data-bs-target="#customItemModal">
+                                        <i class="ti ti-tools"></i> Custom-made item
+                                    </button>
+                                </div>
+                                <?php endif; ?>
+                                <!-- Warehouse order: what this bill asks the warehouse to deliver -->
+                                <div id="wh_banner" class="alert alert-warning d-flex align-items-center justify-content-between py-2 mb-2" style="display:none;">
+                                    <span>
+                                        <b><span id="wh_banner_count">0</span></b> item(s) will be delivered by the warehouse &mdash;
+                                        <span id="wh_banner_state">needs the customer's details</span>.
+                                    </span>
+                                    <button type="button" id="wh_open_details" class="btn btn-sm btn-outline-secondary">Delivery details</button>
+                                </div>
+                                <input type="hidden" name="wh_supplier_shop" id="wh_supplier_shop" value="<?=$supplierShopId?>">
+                                <input type="hidden" name="wh_customer_id" id="wh_customer_id" value="">
                                 <div class="card-invoice-footer">
                                     <div class="row">
                                         <div class="col-md-6">
@@ -404,6 +426,7 @@ $customerdata = $dbObj->getData($sql);
     <script src="../Assets/libs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../Assets/js/sidebarmenu.js"></script>
     <script src="../Assets/jquery/guipos.js"></script>
+    <script src="../Assets/jquery/pos_warehouse_order.js?v=20260924"></script>
     <script src="../Assets/jquery/daily-sales.js"></script>
     <script src="../Assets/js/app.min.js"></script>
     <script src="../Assets/libs/simplebar/dist/simplebar.js"></script>
