@@ -301,6 +301,38 @@ final class WarehouseOrderTest extends DatabaseTestCase
         $this->assertSame(WarehouseOrder::CANCELLED, $this->statusOf($id));
     }//nothing given, nothing supplied
 
+    //Two of three beds went out and reached the customer; the warehouse then ran dry and took
+    //the last one off the order. The customer HAS two beds, so the order is finished, not
+    //cancelled - reading Cancelled would invite a refund of the whole invoice.
+    public function test_an_order_that_part_delivered_before_being_cut_short_is_completed()
+    {
+        $id = $this->order([['source' => 'WAREHOUSE', 'product_id' => $this->bedHere,
+            'supplier_product_id' => $this->bedThere, 'description' => 'Cooler Bed', 'qty' => 3,
+            'notes' => '', 'unit_price' => 800]])['order_id'];
+        $line = (int) $this->warehouseLines($id)[0]['COLID'];
+        $this->pdo->prepare('UPDATE customerorderlines SET DispatchedQty = 2, DeliveredQty = 2 WHERE COLID = ?')
+            ->execute([$line]);
+
+        $this->orders->cannotSupply($id, $this->warehouse, $this->picker, $line, 'None left');
+
+        $this->assertSame(WarehouseOrder::COMPLETED, $this->statusOf($id));
+    }//part delivered, then cut short
+
+    //the same, while the van is still out: the order is not finished and must not be closed
+    public function test_an_order_with_goods_on_the_road_is_not_cancelled_by_cutting_the_rest()
+    {
+        $id = $this->order([['source' => 'WAREHOUSE', 'product_id' => $this->bedHere,
+            'supplier_product_id' => $this->bedThere, 'description' => 'Cooler Bed', 'qty' => 3,
+            'notes' => '', 'unit_price' => 800]])['order_id'];
+        $line = (int) $this->warehouseLines($id)[0]['COLID'];
+        $this->pdo->prepare('UPDATE customerorderlines SET DispatchedQty = 2, DeliveredQty = 0 WHERE COLID = ?')
+            ->execute([$line]);
+
+        $this->orders->cannotSupply($id, $this->warehouse, $this->picker, $line, 'None left');
+
+        $this->assertSame(WarehouseOrder::DISPATCHED, $this->statusOf($id));
+    }//goods on the road
+
     public function test_a_reason_is_required_to_refuse_a_line()
     {
         $id = $this->order()['order_id'];

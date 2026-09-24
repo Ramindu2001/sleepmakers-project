@@ -68,7 +68,19 @@ try
 
         //the dispatch actions name the trip in `id`, not the order
         case 'open_dispatch':
-            $result = $dispatches->open($id, $shop_id, $user_id);
+            //the van may not hold everything that is ready: line_id[]/line_qty[] say what goes
+            $wanted = null;
+            if(isset($_POST['line_id']) && is_array($_POST['line_id']))
+            {
+                $wanted = [];
+                foreach($_POST['line_id'] as $at => $line)
+                {
+                    $wanted[] = ['line_id' => (int)$line,
+                        'qty' => (isset($_POST['line_qty'][$at]) && $_POST['line_qty'][$at] !== '')
+                            ? (float)$_POST['line_qty'][$at] : null];
+                }
+            }//a trip the dispatcher chose the contents of
+            $result = $dispatches->open($id, $shop_id, $user_id, $wanted);
             wo_done($result['message'], ['dispatch_id' => $result['dispatch_id']]);
             break;
 
@@ -98,5 +110,7 @@ catch(CustomerOrderRefused $e)
 }
 catch(Throwable $e)
 {
-    wo_respond(500, ['ok' => false, 'message' => 'Something went wrong: ' . $e->getMessage()]);
+    //the raw message can carry table and column names, so it goes to the log, not the screen
+    error_log('WarehouseOrderController: ' . $e->getMessage());
+    wo_respond(500, ['ok' => false, 'message' => 'Something went wrong and nothing was saved. Please try again.']);
 }

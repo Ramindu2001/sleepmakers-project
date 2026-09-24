@@ -229,8 +229,22 @@ if($openDispatch !== null)
                         <?php if($canProcess && $open) { ?>
                         <button class="btn btn-info wo-action" data-action="mark_ready">Everything is ready</button>
                         <?php } ?>
-                        <?php if($canProcess && $open && $anyReady && $openDispatch === null) { ?>
-                        <button class="btn btn-primary wo-action" data-action="open_dispatch">Start a dispatch</button>
+                        <?php if($canProcess && $open && $anyReady && $openDispatch === null) {
+                            //what is ready, so the dispatcher can send less than all of it when
+                            //the van will not hold it
+                            $readyLines = [];
+                            foreach($lines as $line)
+                            {
+                                if((int)$line['LineStat'] !== WarehouseOrder::LINE_READY)
+                                {
+                                    continue;
+                                }
+                                $readyLines[] = ['id' => (int)$line['COLID'], 'name' => $line['Description'],
+                                    'qty' => (float)$line['Qty'] - (float)$line['DispatchedQty']];
+                            }//each ready line
+                        ?>
+                        <button class="btn btn-primary wo-action" data-action="open_dispatch"
+                            data-ready="<?= wo_h(json_encode($readyLines)) ?>">Start a dispatch</button>
                         <?php } ?>
                         <?php foreach($orderView['dispatches'] as $sent) {
                             if((int)$sent['DispatchStat'] !== OrderDispatch::SENT || $sent['DeliveredAt'] !== null) { continue; } ?>

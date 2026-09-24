@@ -29,7 +29,8 @@ class DispatchScan extends ScanDocument
     {
         return $this->transaction(function() use ($dispatch_id, $shop_id, $user_id, $raw, $decisions) {
             $dispatch = $this->openDispatch($dispatch_id, $shop_id, $user_id);
-            if((int)$dispatch['InvStat'] !== 1)
+            //an order can exist without an invoice; only a real, cancelled one stops the goods
+            if($dispatch['InvoiceHeader_IHID'] !== null && (int)$dispatch['InvStat'] !== 1)
             {
                 throw new ScanRefused(409, 'Invoice ' . $dispatch['InvoiceNo'] . ' was cancelled. Nothing on this order should be sent.');
             }//the sale was returned overnight
@@ -162,9 +163,11 @@ class DispatchScan extends ScanDocument
             }
             if(isset($busy[(int)$unit['PUID']]))
             {
-                $errors[] = $this->errorLine($code, 1, 'Being dispatched on ' . $busy[(int)$unit['PUID']]);
+                $errors[] = $this->errorLine($code, 1, $busy[(int)$unit['PUID']] === true
+                    ? 'Already scanned into this dispatch'
+                    : 'Being dispatched on ' . $busy[(int)$unit['PUID']]);
                 continue;
-            }
+            }//it is already accounted for, here or on somebody else's trip
             if(empty($unit['ShopProductID']))
             {
                 $errors[] = $this->errorLine($code, 1, 'Not a product we know');
@@ -290,23 +293,27 @@ class DispatchScan extends ScanDocument
         return $no === false ? 'another dispatch' : $no;
     }//dispatch no of
 
-    //units sitting in somebody else's open dispatch right now
-    private function unitsBeingDispatched(array $unit_ids, $except_dispatch_id)
+    //Units already accounted for in an open dispatch: true when it is this one (an earlier
+    //upload already took it), otherwise the number of the trip holding it. Without the first
+    //case a sticker swept twice across two uploads would be counted twice - or, with the unique
+    //key on (dispatch, sticker), would fail the whole batch with a database error.
+    private function unitsBeingDispatched(array $unit_ids, $this_dispatch_id)
     {
         $unit_ids = array_values(array_filter(array_map('intval', $unit_ids)));
         if(empty($unit_ids))
         {
             return [];
         }
-        $stmt = $this->connect()->prepare("SELECT dl.productunits_PUID, d.DispatchNo
+        $stmt = $this->connect()->prepare("SELECT dl.productunits_PUID, dl.orderdispatches_DSID, d.DispatchNo
             FROM orderdispatchlines dl INNER JOIN orderdispatches d ON d.DSID = dl.orderdispatches_DSID
-            WHERE d.DispatchStat = ? AND d.DSID <> ? AND dl.productunits_PUID IN ("
+            WHERE d.DispatchStat = ? AND dl.productunits_PUID IN ("
             . implode(',', array_fill(0, count($unit_ids), '?')) . ");");
-        $stmt->execute(array_merge([OrderDispatch::OPEN, (int)$except_dispatch_id], $unit_ids));
+        $stmt->execute(array_merge([OrderDispatch::OPEN], $unit_ids));
         $busy = [];
         foreach($stmt->fetchAll(PDO::FETCH_ASSOC) as $row)
         {
-            $busy[(int)$row['productunits_PUID']] = $row['DispatchNo'];
+            $busy[(int)$row['productunits_PUID']] = (int)$row['orderdispatches_DSID'] === (int)$this_dispatch_id
+                ? true : $row['DispatchNo'];
         }
         return $busy;
     }//units being dispatched

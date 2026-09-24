@@ -176,6 +176,32 @@ final class DispatchScanTest extends DatabaseTestCase
         $this->dispatches->open($this->orderId, $this->shop, $this->cashier);
     }//only the warehouse dispatches
 
+    //the van has room for one bed and not the pillow: the dispatcher says so when opening it
+    public function test_a_dispatch_can_be_opened_for_part_of_what_is_ready()
+    {
+        $pillow = $this->createProduct($this->warehouse, 'PIL00001', 'Pillow');
+        $this->addStock($pillow, $this->warehouse, 4, 'P1', 50, 90);
+        $this->readyOrder(3);
+        $extra = $this->orders->get($this->orderId, $this->warehouse, $this->picker);
+
+        $dispatch = $this->dispatches->open($this->orderId, $this->warehouse, $this->picker,
+            [['line_id' => $this->lineId, 'qty' => 1]])['dispatch_id'];
+
+        $lines = $this->dispatches->get($dispatch, $this->warehouse)['lines'];
+        $this->assertCount(1, $lines);
+        $this->assertSame(1.0, (float) $lines[0]['Needed']);
+    }//part of what is ready
+
+    public function test_asking_for_more_than_is_owed_takes_only_what_is_owed()
+    {
+        $this->readyOrder(2);
+
+        $dispatch = $this->dispatches->open($this->orderId, $this->warehouse, $this->picker,
+            [['line_id' => $this->lineId, 'qty' => 99]])['dispatch_id'];
+
+        $this->assertSame(2.0, (float) $this->dispatches->get($dispatch, $this->warehouse)['lines'][0]['Needed']);
+    }//never more than is owed
+
     public function test_an_open_dispatch_can_be_cancelled_and_moves_no_stock()
     {
         $dispatch = $this->openDispatch();
@@ -533,6 +559,80 @@ final class DispatchScanTest extends DatabaseTestCase
         $this->expectException(CustomerOrderRefused::class);
         $this->dispatches->delivered($dispatch, $this->warehouse, $this->picker, '');
     }//only a sent dispatch is delivered
+
+    //a slow click, clicked twice: the customer must not end up "delivered" twice over
+    public function test_delivering_the_same_dispatch_twice_changes_nothing()
+    {
+        $dispatch = $this->openDispatch();
+        $this->scan()->apply($dispatch, $this->warehouse, $this->picker, 'COO00001', []);
+        $this->dispatches->complete($dispatch, $this->warehouse, $this->picker, ['confirm_balance' => 1]);
+        $this->dispatches->delivered($dispatch, $this->warehouse, $this->picker, 'Left with the customer');
+
+        try {
+            $this->dispatches->delivered($dispatch, $this->warehouse, $this->picker, 'again');
+            $this->fail('the same dispatch was delivered twice');
+        } catch (CustomerOrderRefused $e) {
+            $this->assertSame(409, $e->status);
+        }
+
+        $stmt = $this->pdo->prepare('SELECT DeliveredQty FROM customerorderlines WHERE COLID = ?');
+        $stmt->execute([$this->lineId]);
+        $this->assertSame(1.0, (float) $stmt->fetchColumn());
+    }//delivering twice
+
+    //the picker scanned the bed, applied, then swept the same sticker again in the next batch
+    public function test_a_sticker_already_in_this_dispatch_is_refused_not_counted_again()
+    {
+        $dispatch = $this->openDispatch(2);
+        $code = $this->printUnit();
+        $this->scan()->apply($dispatch, $this->warehouse, $this->picker, $code, []);
+
+        $preview = $this->scan()->preview($dispatch, $this->warehouse, $this->picker, $code);
+
+        $this->assertSame('error', $preview['lines'][0]['status']);
+        $this->assertStringContainsString('Already scanned', $preview['lines'][0]['message']);
+        $this->assertFalse($preview['can_apply']);
+    }//a sticker already in this dispatch
+
+    public function test_the_batch_is_recorded_on_the_scan_and_not_on_the_plan()
+    {
+        $dispatch = $this->openDispatch();
+        $this->scan()->apply($dispatch, $this->warehouse, $this->picker, 'COO00001', []);
+
+        $this->dispatches->complete($dispatch, $this->warehouse, $this->picker, ['confirm_balance' => 1]);
+
+        $stmt = $this->pdo->prepare('SELECT PlannedQty, InventoryID, Batch_ID FROM orderdispatchlines
+            WHERE orderdispatches_DSID = ? ORDER BY DDID');
+        $stmt->execute([$dispatch]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $plan = $rows[0];
+        $scan = $rows[1];
+        $this->assertNull($plan['InventoryID'], 'the plan row must not carry a batch');
+        $this->assertNotNull($scan['InventoryID'], 'the scanned row must carry the batch it came from');
+        $this->assertSame('B1', $scan['Batch_ID']);
+    }//the batch is recorded on the scan
+
+    public function test_an_order_with_no_invoice_can_still_be_scanned()
+    {
+        $this->orderId = $this->orders->createFromSale($this->shop, $this->cashier, [
+            'invoice_id' => null, 'supplier_shop_id' => $this->warehouse, 'customer_id' => null,
+            'cust_name' => 'Walk in', 'cust_phone' => '0770000000', 'cust_address' => '',
+            'deliver_to' => 2, 'delivery_address' => '', 'delivery_phone' => '', 'delivery_note' => '',
+            'needed_by' => null, 'notes' => '', 'lines' => [
+                ['source' => 'WAREHOUSE', 'product_id' => $this->bedHere, 'supplier_product_id' => $this->bedThere,
+                    'description' => 'Cooler Bed', 'qty' => 1, 'notes' => '', 'unit_price' => 800],
+            ]])['order_id'];
+        $this->lineId = $this->lineOf($this->orderId);
+        $this->orders->markReady($this->orderId, $this->warehouse, $this->picker);
+        $dispatch = $this->dispatches->open($this->orderId, $this->warehouse, $this->picker)['dispatch_id'];
+
+        $this->scan()->apply($dispatch, $this->warehouse, $this->picker, 'COO00001', []);
+
+        $stmt = $this->pdo->prepare('SELECT COALESCE(SUM(Qty), 0) FROM orderdispatchlines
+            WHERE orderdispatches_DSID = ? AND PlannedQty IS NULL');
+        $stmt->execute([$dispatch]);
+        $this->assertSame(1.0, (float) $stmt->fetchColumn());
+    }//an order with no invoice
 
     public function test_a_sent_dispatch_cannot_be_cancelled()
     {

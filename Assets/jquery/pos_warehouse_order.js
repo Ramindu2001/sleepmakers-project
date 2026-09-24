@@ -76,11 +76,11 @@ function markWarehouseRow(row, opts) {
     if (opts.supplier_shop) {
         $("#wh_supplier_shop").val(opts.supplier_shop);
     }
-    row.find(".Item_name").after(
-        '<span class="badge bg-warning text-dark mt-1 wh-badge">' +
-        (opts.custom ? "Custom-made" : "From " + (opts.supplier_name || "the warehouse")) +
-        '</span> <a href="javascript:void(0)" class="badge bg-secondary mt-1 wh-note-btn">Specs</a>'
-    );
+    // the shop name is set by an admin, but it is still data: put it in as text, never markup
+    var badge = $('<span class="badge bg-warning text-dark mt-1 wh-badge"></span>')
+        .text(opts.custom ? "Custom-made" : "From " + (opts.supplier_name || "the warehouse"));
+    var specs = $('<a href="javascript:void(0)" class="badge bg-secondary mt-1 wh-note-btn"></a>').text("Specs");
+    row.find(".Item_name").after(badge, " ", specs);
 }//markWarehouseRow
 
 // ---- the order details ----------------------------------------------------------------------
@@ -135,6 +135,10 @@ $(function () {
             toastr.warning("The customer's name, phone and address are needed.", "Not saved");
             warehouseChanged();
             return;
+        }
+        // the order keeps the customer's own address; where it is being sent may differ
+        if ($.trim($("#wh_cust_address").val() || "") === "") {
+            $("#wh_cust_address").val($("#wh_address").val() || "");
         }
         $("#warehouseOrderModal").modal("hide");
         warehouseChanged();

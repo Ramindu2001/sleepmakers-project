@@ -196,6 +196,11 @@ class OrderDispatch extends Dbh
             {
                 throw new CustomerOrderRefused(409, 'Dispatch ' . $dispatch['DispatchNo'] . ' has not been sent yet.');
             }
+            if($dispatch['DeliveredAt'] !== null)
+            {
+                throw new CustomerOrderRefused(409, 'Dispatch ' . $dispatch['DispatchNo']
+                    . ' was already marked delivered on ' . $dispatch['DeliveredAt'] . '.');
+            }//a second click must not deliver the same goods twice
 
             foreach($this->scannedLines($dispatch_id) as $line_id => $qty)
             {
@@ -301,8 +306,11 @@ class OrderDispatch extends Dbh
             WHERE INID = ? AND CurrentQty >= ?;");
         $cost = $this->connect()->prepare("INSERT INTO inventory_consumption (invoice_headerID, status, inventory_INID,
             price, sold_price, `batch No`, product_PDID, quantity, shop_SHID) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?);");
+        //PlannedQty IS NULL keeps this off the plan row: the batch belongs on the row that
+        //records the item actually scanned out, which is what traces a unit to its customer
         $stamp = $this->connect()->prepare("UPDATE orderdispatchlines SET InventoryID = ?, Batch_ID = ?
-            WHERE orderdispatches_DSID = ? AND products_PDID = ? AND InventoryID IS NULL LIMIT 1;");
+            WHERE orderdispatches_DSID = ? AND products_PDID = ? AND PlannedQty IS NULL
+              AND InventoryID IS NULL ORDER BY DDID LIMIT 1;");
         foreach($parts as $part)
         {
             $move->execute([$part['qty'], $part['qty'], $part['inventory_id'], $part['qty']]);

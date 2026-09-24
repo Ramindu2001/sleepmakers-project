@@ -58,6 +58,31 @@ $(function () {
             fields.id = button.data("dispatch");
         }//dispatch actions name the trip, not the order
 
+        // Starting a trip: everything ready goes by default, but a line of several can be split
+        // when the van will not hold it all.
+        if (action === "open_dispatch") {
+            var ready = button.data("ready") || [];
+            fields.line_id = [];
+            fields.line_qty = [];
+            for (var i = 0; i < ready.length; i++) {
+                var going = ready[i].qty;
+                if (ready[i].qty > 1) {
+                    var answer = prompt("How many " + ready[i].name + " go on this trip? (up to "
+                        + ready[i].qty + ", 0 to leave it behind)", ready[i].qty);
+                    if (answer === null) {
+                        return;
+                    }
+                    going = parseFloat(answer);
+                    if (isNaN(going) || going < 0) {
+                        toastr.warning("That is not a quantity.", "Not started");
+                        return;
+                    }
+                }
+                fields.line_id.push(ready[i].id);
+                fields.line_qty.push(going);
+            }
+        }
+
         if (button.data("ask-note")) {
             var note = prompt(button.data("ask-note"), "");
             if (note === null) {

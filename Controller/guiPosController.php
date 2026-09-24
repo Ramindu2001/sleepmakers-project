@@ -41,7 +41,7 @@ if(isset($_GET["cash"]) || isset($_POST["cash"]))
             $totals = $_POST["totals"][$i];
             $original_total = $_POST["original_total"][$i];
             $productData=$guiObj->select_product($item_id);
-            if($productData[0]["ItemType"]=="P" && empty($_POST["wh_line"][$i]))
+            if(empty($_POST["wh_line"][$i]) && isset($productData[0]) && $productData[0]["ItemType"]=="P")
             {
                 $inventoryData=$guiObj->getInventory($item_id,$original_rate, $shop_id, $company_id, $is_commonStock, $stockType, false, $is_expire);
                 if(count($inventoryData) > 0)
@@ -277,7 +277,7 @@ if(isset($_GET["cash"]) || isset($_POST["cash"]))
                 $totals = $_POST["totals"][$i];
                 $original_total = $_POST["original_total"][$i];
                 $productData=$guiObj->select_product($item_id);
-                if($productData[0]["ItemType"]=="P" && empty($_POST["wh_line"][$i]))
+                if(empty($_POST["wh_line"][$i]) && isset($productData[0]) && $productData[0]["ItemType"]=="P")
                 {
                     $inventoryData=$guiObj->getInventory($item_id,$original_rate, $shop_id, $company_id, $is_commonStock, $stockType, false, $is_expire);
                     
@@ -753,7 +753,7 @@ if(isset($_GET["btn_submit_invoice"]) || isset($_GET["btn_submit"]))
             $totals = $_POST["totals"][$i];
             $original_total = $_POST["original_total"][$i];
             $productData=$guiObj->select_product($item_id);
-            if($productData[0]["ItemType"]=="P" && empty($_POST["wh_line"][$i]))
+            if(empty($_POST["wh_line"][$i]) && isset($productData[0]) && $productData[0]["ItemType"]=="P")
             {
                 $inventoryData=$guiObj->getInventory($item_id,$original_rate, $shop_id, $company_id, $is_commonStock, $stockType, false, $is_expire);
                 if(count($inventoryData) > 0)
@@ -1010,7 +1010,7 @@ if(isset($_GET["btn_submit_invoice"]) || isset($_GET["btn_submit"]))
                 $totals = $_POST["totals"][$i];
                 $original_total = $_POST["original_total"][$i];
                 $productData=$guiObj->select_product($item_id);
-                if($productData[0]["ItemType"]=="P" && empty($_POST["wh_line"][$i]))
+                if(empty($_POST["wh_line"][$i]) && isset($productData[0]) && $productData[0]["ItemType"]=="P")
                 {
                     $inventoryData=$guiObj->getInventory($item_id,$original_rate, $shop_id, $company_id, $is_commonStock, $stockType, false, $is_expire);
                     if(count($inventoryData) > 0)

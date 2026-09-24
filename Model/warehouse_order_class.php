@@ -261,7 +261,7 @@ class WarehouseOrder extends Dbh
             $stmt->execute([(int)$order_id, $line['source'],
                 $line['source'] === 'GIVEN' ? self::LINE_GIVEN : self::LINE_PENDING,
                 $line['product_id'], $line['supplier_product_id'], $line['description'], $line['qty'],
-                $line['unit_price'], round($line['qty'] * $line['unit_price'], 2), $line['notes'], $i + 1]);
+                $line['unit_price'], $line['line_total'], $line['notes'], $i + 1]);
         }//each line, in the order the cart had them
     }//insert lines
 
@@ -360,6 +360,10 @@ class WarehouseOrder extends Dbh
             'description' => mb_substr($description, 0, 255),
             'qty' => $qty,
             'unit_price' => round((float)(isset($line['unit_price']) ? $line['unit_price'] : 0), 2),
+            //what was charged for the line; falls back to qty x price when the caller says nothing
+            'line_total' => isset($line['line_total']) && $line['line_total'] !== null
+                ? round((float)$line['line_total'], 2)
+                : round($qty * (float)(isset($line['unit_price']) ? $line['unit_price'] : 0), 2),
             'notes' => isset($line['notes']) && trim((string)$line['notes']) !== ''
                 ? mb_substr(trim((string)$line['notes']), 0, 255) : null,
         ];
@@ -552,11 +556,10 @@ class WarehouseOrder extends Dbh
                 continue;
             }//given at the shop: the customer already has it
             $warehouse++;
-            if((int)$line['LineStat'] === self::LINE_CANCELLED)
-            {
-                $cancelled++;
-                continue;
-            }
+            //What this line has already done counts even when the rest of it was cut short:
+            //two beds delivered and the third cancelled is a served customer, not a cancelled
+            //order, and goods still on the road keep the order open whatever happened to the
+            //remainder.
             if((float)$line['DeliveredQty'] > 0)
             {
                 $served++;
@@ -565,6 +568,11 @@ class WarehouseOrder extends Dbh
             {
                 $onTheRoad++;
             }
+            if((int)$line['LineStat'] === self::LINE_CANCELLED)
+            {
+                $cancelled++;
+                continue;
+            }//nothing more will be picked for it
             if((float)$line['Qty'] - (float)$line['DispatchedQty'] > 0)
             {
                 $open++;

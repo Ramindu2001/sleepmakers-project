@@ -397,7 +397,7 @@ else if(!isset($_GET["product_id"]) && (isset($_GET["subcat"]) || isset($_GET["v
     {
         $warehouseRows = (new WarehouseOrder())->searchSupplier($shop_id, trim($_GET["value"]));
         $alreadyShown = array();
-        foreach($productData2 as $shown)
+        foreach($productData as $shown)
         {
             $alreadyShown[strtoupper(trim($shown["Barcode"]))] = true;
         }//what this shop already offered

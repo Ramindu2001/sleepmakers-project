@@ -68,6 +68,9 @@ function warehouseOrderBuild($shop_id, $user_id, $create)
             'qty' => isset($_POST['qty'][$i]) ? $_POST['qty'][$i] : 0,
             'notes' => isset($_POST['wh_notes'][$i]) ? $_POST['wh_notes'][$i] : '',
             'unit_price' => isset($_POST['rate'][$i]) ? $_POST['rate'][$i] : 0,
+            //what the customer was actually charged for the line, after any discount on it -
+            //warehouse staff reconcile the job sheet against the invoice, so it has to agree
+            'line_total' => isset($_POST['totals'][$i]) ? $_POST['totals'][$i] : null,
         );
     }//each cart line
 
@@ -118,6 +121,9 @@ function warehouseOrderPlace($shop_id, $user_id, $invoice_id, array &$alert)
     }
     catch(Throwable $e)
     {
+        //there is no transaction around the legacy checkout, so the sale stands. Leave a
+        //trace in the log as well as on the screen: a toast is easy to miss.
+        error_log('warehouse order NOT created for invoice ' . $invoice_id . ': ' . $e->getMessage());
         $alert['Error'][] = 'The invoice was saved but the warehouse order was not: ' . $e->getMessage()
             . ' Please tell the warehouse about this invoice.';
         return null;
