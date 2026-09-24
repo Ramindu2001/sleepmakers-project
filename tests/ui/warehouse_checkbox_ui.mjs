@@ -95,6 +95,49 @@ try {
   run.check('the banner counts it', (await bannerCount()) === '1');
   await run.shot('checkbox-4-warehouse-tile.png');
 
+
+  console.log('\nThe delivery details have to reach the server');
+  await run.js(`document.getElementById('wh_open_details').click()`);
+  await sleep(700);
+  run.check('the delivery details open', await run.js(`document.getElementById('warehouseOrderModal').classList.contains('show')`));
+  await run.js(`document.getElementById('wh_cust_name').value = 'e2e Kamala';
+    document.getElementById('wh_cust_phone').value = '0777654321';
+    document.getElementById('wh_address').value = '4 Temple Lane';
+    document.getElementById('wh_phone').value = '0777654321';
+    document.getElementById('wh_save_details').click()`);
+  await sleep(800);
+  run.check('they are accepted', !(await run.js(`document.getElementById('warehouseOrderModal').classList.contains('show')`)));
+  run.check('the banner says the sale is ready',
+    (await run.js(`document.getElementById('wh_banner_state').textContent`)) === 'ready');
+
+  // the sale posts $("#order_form").serialize(): anything outside that form is simply not sent
+  const posted = new URLSearchParams(await run.js(`$("#order_form").serialize()`));
+  run.check('the customer name is posted with the sale', posted.get('wh_cust_name') === 'e2e Kamala');
+  run.check('the phone number is posted with the sale', posted.get('wh_cust_phone') === '0777654321');
+  run.check('the delivery address is posted with the sale', posted.get('wh_address') === '4 Temple Lane');
+  run.check('and so is the warehouse the goods come from', Number(posted.get('wh_supplier_shop')) > 0);
+
+  console.log('\nTaking the money');
+  // the number the till prints is what the customer quotes back, so the warehouse must show it
+  const billNo = await run.js(`document.getElementById('invoice-no').textContent.trim()`);
+  run.check('the till shows a bill number', /\w+-\d+/.test(billNo));
+  await run.js(`document.getElementById('pay_cash').click()`);
+  await sleep(3000);
+  run.check('the sale was not refused for want of a customer', !(await toast()).includes('warehouse order'));
+
+  await run.go(`${BASE}/Public/customer-orders.php`);
+  const orders = await run.js(`document.body.textContent`);
+  run.check('the order is waiting for the warehouse, with the customer on it',
+    orders.includes('e2e Kamala') && orders.includes('Pending'));
+  // this POS leaves invoiceheader.InvoiceNo empty and puts the printed number on BillNo, so an
+  // Invoice column reading InvoiceNo was blank on every order the till ever created
+  const invoiceCell = await run.js(`(() => {
+    const row = [...document.querySelectorAll('table tbody tr')].find((r) => r.textContent.includes('e2e Kamala'));
+    return row ? row.cells[1].textContent.trim() : '';
+  })()`);
+  run.check('and the Invoice column names the bill it was paid on (' + invoiceCell + ')',
+    /\w+-\d+/.test(invoiceCell));
+  await run.shot('checkbox-5-order-created.png');
   run.checkScripts('no JavaScript errors from the POS scripts', /guipos\.js|pos_warehouse_order\.js/);
 } catch (e) {
   failure = e;

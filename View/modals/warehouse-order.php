@@ -2,6 +2,8 @@
 //Asked at the counter when the bill has anything the shop cannot hand over: who the warehouse
 //is delivering to, and where. The fields post with the sale
 //(docs/superpowers/specs/2026-09-24-pos-warehouse-fulfilment-design.md).
+//Every field here carries form="order_form": the modal is rendered outside the till's form,
+//and the sale posts $("#order_form").serialize(), which would otherwise leave them all behind.
 ?>
 <div class="modal fade" id="warehouseOrderModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -18,37 +20,37 @@
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label">Customer name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" name="wh_cust_name" id="wh_cust_name" maxlength="120">
+                        <input type="text" class="form-control" form="order_form" name="wh_cust_name" id="wh_cust_name" maxlength="120">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Phone <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" name="wh_cust_phone" id="wh_cust_phone" maxlength="25">
+                        <input type="text" class="form-control" form="order_form" name="wh_cust_phone" id="wh_cust_phone" maxlength="25">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Send it to</label>
-                        <select class="form-select" name="wh_deliver_to" id="wh_deliver_to">
+                        <select class="form-select" form="order_form" name="wh_deliver_to" id="wh_deliver_to">
                             <option value="1">The customer's address</option>
                             <option value="2">The customer collects at the shop</option>
                         </select>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Wanted by</label>
-                        <input type="date" class="form-control" name="wh_needed_by" id="wh_needed_by">
+                        <input type="date" class="form-control" form="order_form" name="wh_needed_by" id="wh_needed_by">
                     </div>
                     <div class="col-12" id="wh_address_row">
                         <label class="form-label">Delivery address <span class="text-danger">*</span></label>
-                        <textarea class="form-control" name="wh_address" id="wh_address" rows="2" maxlength="255"></textarea>
+                        <textarea class="form-control" form="order_form" name="wh_address" id="wh_address" rows="2" maxlength="255"></textarea>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Another phone for the driver</label>
-                        <input type="text" class="form-control" name="wh_phone" id="wh_phone" maxlength="25">
+                        <input type="text" class="form-control" form="order_form" name="wh_phone" id="wh_phone" maxlength="25">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Directions or landmarks</label>
-                        <input type="text" class="form-control" name="wh_note" id="wh_note" maxlength="255">
+                        <input type="text" class="form-control" form="order_form" name="wh_note" id="wh_note" maxlength="255">
                     </div>
                     <div class="col-12">
-                        <input type="hidden" name="wh_cust_address" id="wh_cust_address" value="">
+                        <input type="hidden" form="order_form" name="wh_cust_address" id="wh_cust_address" value="">
                         <small class="text-muted">
                             Press <b>Specs</b> beside an item in the bill to tell the warehouse what the
                             customer asked for &mdash; size, colour, firmness.

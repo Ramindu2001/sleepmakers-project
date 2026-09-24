@@ -292,6 +292,12 @@ class E2EFixtures
         $this->pdo->exec("DELETE FROM productunits WHERE shop_SHID IN ($shops)");
         $this->pdo->exec("DELETE FROM barcodesettings WHERE shop_SHID IN ($shops)");
         $this->pdo->exec("DELETE FROM barcodesequence WHERE shop_SHID IN ($shops)");
+        //a check that took a real sale leaves an invoice pointing at an e2e user or shop
+        $invoices = "SELECT IHID FROM invoiceheader WHERE user_USID IN ($users) OR shop_SHID IN ($shops)";
+        $this->pdo->exec("DELETE FROM inventory_consumption WHERE invoice_headerID IN ($invoices)");
+        $this->pdo->exec("DELETE FROM invoicedetails WHERE InvoiceHeader_IHID IN ($invoices)");
+        $this->pdo->exec("DELETE FROM transactions WHERE InvoiceHeader_IHID IN ($invoices)");
+        $this->pdo->exec("DELETE FROM invoiceheader WHERE user_USID IN ($users) OR shop_SHID IN ($shops)");
         $this->pdo->exec("DELETE FROM user WHERE UserName LIKE 'e2e\\_%'");
         $this->pdo->exec("DELETE FROM userroles WHERE UserRoleName LIKE 'e2e %'");
         $this->pdo->exec("DELETE FROM shop WHERE ShopName LIKE 'e2e %'");
@@ -466,6 +472,13 @@ class E2EStock
         $shops = "SELECT SHID FROM shop WHERE ShopName LIKE 'e2e %'";
         $grns = "SELECT GHID FROM grnheader WHERE shop_SHID IN ($shops)";
         $transfers = "SELECT THID FROM transferheader WHERE TransferFrom IN ($shops) OR TransferTo IN ($shops)";
+        //anything an e2e shop sold goes first: invoice lines point at the products deleted below
+        $invoices = "SELECT IHID FROM invoiceheader WHERE shop_SHID IN ($shops)";
+        $this->pdo->exec("DELETE FROM inventory_consumption WHERE invoice_headerID IN ($invoices)");
+        $this->pdo->exec("DELETE FROM invoicedetails WHERE InvoiceHeader_IHID IN ($invoices)");
+        $this->pdo->exec("DELETE FROM transactions WHERE InvoiceHeader_IHID IN ($invoices)");
+        $this->pdo->exec("DELETE FROM invoiceheader WHERE shop_SHID IN ($shops)");
+        $this->pdo->exec("DELETE FROM docno WHERE shop_id IN ($shops)");
         $this->pdo->exec("DELETE FROM customerorderlines WHERE customerorders_COID IN
             (SELECT COID FROM customerorders WHERE shop_SHID IN ($shops) OR SupplierShopID IN ($shops))");
         $this->pdo->exec("DELETE FROM customerorders WHERE shop_SHID IN ($shops) OR SupplierShopID IN ($shops)");
