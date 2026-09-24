@@ -445,9 +445,10 @@ elseif (isset($_GET["product_id"])) {
         if($match === null)
         {
             $supplier = $orders->supplierShop($shop_id);
-            returnError("00006", ($supplier === null ? "No warehouse" : $supplier["ShopName"])
-                . " does not keep this item, so it cannot be delivered from there."
-                . " Use Custom-made item if it has to be made to order.");
+            returnError("00006", $supplier === null
+                ? "There is no warehouse shop to deliver from."
+                : $supplier["ShopName"] . " does not keep this item, so it cannot be delivered from"
+                    . " there. Use Custom-made item if it has to be made to order.");
         }
         echo json_encode([
             "warehouse_match" => 1,

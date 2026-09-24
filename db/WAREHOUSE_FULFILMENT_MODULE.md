@@ -44,10 +44,23 @@ badged *Delivered from …*. An item with no stock is still offered: the warehou
 the customer waits. For something nobody stocks, press **Custom-made item** and type what it is
 and what it costs.
 
+There is also a checkbox in front of every item name in the cart, **Will be delivered by
+Warehouse**. Tick it on something the shop itself sells and the warehouse delivers that line
+instead: the customer is still billed here, at this shop's price, but nothing comes off this
+shop's shelf. Untick it and the line goes back to the counter. If the warehouse has never
+held that item the tick is refused, naming it - use **Custom-made item** for those.
+
+A ticked row stops merging, so clicking the same item again starts a fresh shop row. That is
+how three beds become two off the shelf and one from the warehouse.
+
+Lines added from a warehouse tile or from **Custom-made item** arrive ticked and locked -
+there is nothing on the shelf to hand over for those - and service lines have no checkbox.
+
 The bill then shows what is being handed over now and what the warehouse owes:
 
 ```
 e2e Bedsheet    2   from the shelf
+e2e Pillow      2   From Warehouse     [Specs]   <- ticked, although the shop has its own
 Cooler Bed      1   From Warehouse     [Specs]
 Headboard       1   Custom-made        [Specs]
 ```
@@ -142,7 +155,7 @@ A cancelled line returns nothing by itself. The shop refunds it through **Sales 
 2. `php db/warehouse_fulfilment_install.php` on the server.
 3. Upload the code (not `tests/`, `tools/` or `docs/`).
 4. Grant **Customer Orders** to the roles that need it (section 1).
-5. The order and scanner scripts are versioned (`?v=20260924`); clear the nginx cache if pages
+5. The order and scanner scripts are versioned (`?v=20260924b`); clear the nginx cache if pages
    still show the old buttons.
 
 ## 8. Tests
@@ -150,6 +163,7 @@ A cancelled line returns nothing by itself. The shop refunds it through **Sales 
 ```
 C:/xampp/php/php.exe tools/phpunit.phar                                  # the model, the scanner, the migration
 C:/xampp/php/php.exe tests/e2e/warehouse_fulfilment_e2e.php              # the whole story over HTTP, both shops
+node tests/ui/warehouse_checkbox_ui.mjs                                  # the cart checkbox, in a real browser
 ```
 
 ## 9. Found while building
