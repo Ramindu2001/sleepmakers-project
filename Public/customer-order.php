@@ -32,13 +32,27 @@ $canProcess = $isSupplier && $orders->can($me, $shop_id, WarehouseOrder::PROCESS
 $canChange = $orders->can($me, $shop_id, WarehouseOrder::CHANGE);
 $open = !in_array((int)$order['OrderStat'], [WarehouseOrder::COMPLETED, WarehouseOrder::CANCELLED], true);
 $anyDispatched = false;
+$anyReady = false;
 foreach($lines as $line)
 {
     if((float)$line['DispatchedQty'] > 0)
     {
         $anyDispatched = true;
     }
-}//anything already gone
+    if((int)$line['LineStat'] === WarehouseOrder::LINE_READY)
+    {
+        $anyReady = true;
+    }
+}//anything already gone, anything ready to go
+
+//the trip being scanned right now, if there is one
+$dispatches = new OrderDispatch();
+$openDispatch = $isSupplier ? $dispatches->openOn($order['COID']) : null;
+if($openDispatch !== null)
+{
+    $scan_upload = ['context' => 'dispatch', 'doc_id' => (int)$openDispatch['DSID'],
+        'title' => $openDispatch['DispatchNo'], 'apply_label' => 'Add to dispatch'];
+}//the scanner dialog is the same one the GRN and transfer pages use
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -191,12 +205,38 @@ foreach($lines as $line)
                     </div>
                     <?php } ?>
 
+                    <?php if($openDispatch !== null) { ?>
+                    <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2">
+                        <span><b><?= wo_h($openDispatch['DispatchNo']) ?></b> is being loaded.
+                            Scan every item before it goes.</span>
+                        <div class="ms-auto d-flex gap-2">
+                            <?php if($canProcess) { ?>
+                            <button class="btn btn-sm btn-primary" id="wo_scan"><i class="ti ti-barcode"></i> Scan items</button>
+                            <button class="btn btn-sm btn-success wo-action" data-action="complete_dispatch"
+                                data-dispatch="<?= (int)$openDispatch['DSID'] ?>">Send it</button>
+                            <button class="btn btn-sm btn-outline-danger wo-action" data-action="cancel_dispatch"
+                                data-dispatch="<?= (int)$openDispatch['DSID'] ?>"
+                                data-confirm="Cancel this dispatch? The scans are thrown away; nothing has left the warehouse.">Cancel dispatch</button>
+                            <?php } ?>
+                        </div>
+                    </div>
+                    <?php } ?>
+
                     <div class="d-flex flex-wrap gap-2 mb-4">
                         <?php if($canProcess && $open && (int)$order['OrderStat'] === WarehouseOrder::PENDING) { ?>
                         <button class="btn btn-warning wo-action" data-action="start_preparing">Start preparing</button>
                         <?php } ?>
                         <?php if($canProcess && $open) { ?>
                         <button class="btn btn-info wo-action" data-action="mark_ready">Everything is ready</button>
+                        <?php } ?>
+                        <?php if($canProcess && $open && $anyReady && $openDispatch === null) { ?>
+                        <button class="btn btn-primary wo-action" data-action="open_dispatch">Start a dispatch</button>
+                        <?php } ?>
+                        <?php foreach($view['dispatches'] as $sent) {
+                            if((int)$sent['DispatchStat'] !== OrderDispatch::SENT || $sent['DeliveredAt'] !== null) { continue; } ?>
+                        <button class="btn btn-success wo-action" data-action="delivered" data-dispatch="<?= (int)$sent['DSID'] ?>"
+                            data-ask-note="Who took it, and any note about the delivery?">
+                            <?= wo_h($sent['DispatchNo']) ?> reached the customer</button>
                         <?php } ?>
                         <?php if($isOurs && $canChange && $open && !$anyDispatched) { ?>
                         <button class="btn btn-outline-danger wo-action" data-action="cancel_order"
@@ -207,11 +247,15 @@ foreach($lines as $line)
             </div>
         </div>
     </div>
+    <?php if($openDispatch !== null) { include '../View/modals/scan-upload.php'; } ?>
     <?php include '../View/footer.php'; ?>
     <script src="../Assets/libs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="../Assets/js/sidebarmenu.js"></script>
     <script src="../Assets/js/app.min.js"></script>
     <script src="../Assets/libs/simplebar/dist/simplebar.js"></script>
+    <?php if($openDispatch !== null) { ?>
+    <script src="../Assets/jquery/scan_upload.js?v=20260924"></script>
+    <?php } ?>
     <script src="../Assets/jquery/warehouse_order.js?v=20260924"></script>
 </body>
 

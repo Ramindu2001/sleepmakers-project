@@ -55,6 +55,7 @@ class OrderDispatch extends Dbh
             }//what the dispatcher asked for
 
             $take = [];
+            $products = [];
             foreach($this->orders->linesOf($order_id) as $line)
             {
                 if((int)$line['LineStat'] !== WarehouseOrder::LINE_READY)
@@ -75,6 +76,8 @@ class OrderDispatch extends Dbh
                 if($qty > 0)
                 {
                     $take[(int)$line['COLID']] = $qty;
+                    //a custom-made line has no product of its own; it is ticked off by hand
+                    $products[(int)$line['COLID']] = $line['SupplierProductID'] === null ? 0 : (int)$line['SupplierProductID'];
                 }
             }//each line
 
@@ -84,12 +87,24 @@ class OrderDispatch extends Dbh
             }
 
             $no = $this->nextDispatchNo($shop_id);
+            $now = date('Y-m-d H:i:s');
             $this->connect()->prepare("INSERT INTO orderdispatches (DispatchNo, customerorders_COID, shop_SHID,
                 DispatchStat, DeliverTo, CreatedBy, CreatedAt) VALUES (?, ?, ?, ?, ?, ?, ?);")
                 ->execute([$no, (int)$order_id, (int)$shop_id, self::OPEN, (int)$order['DeliverTo'],
-                    (int)$user_id, date('Y-m-d H:i:s')]);
+                    (int)$user_id, $now]);
+            $dispatch_id = (int)$this->connect()->lastInsertId();
 
-            return ['dispatch_id' => (int)$this->connect()->lastInsertId(), 'dispatch_no' => $no,
+            //One plan row per line says what THIS trip is to take. Without it a van that can
+            //only hold two of three beds could never be sent.
+            $plan = $this->connect()->prepare("INSERT INTO orderdispatchlines (orderdispatches_DSID,
+                customerorderlines_COLID, products_PDID, Qty, PlannedQty, ScannedAt, ScannedBy)
+                VALUES (?, ?, ?, 0, ?, ?, ?);");
+            foreach($take as $line_id => $qty)
+            {
+                $plan->execute([$dispatch_id, (int)$line_id, (int)$products[$line_id], $qty, $now, (int)$user_id]);
+            }//each line this trip carries
+
+            return ['dispatch_id' => $dispatch_id, 'dispatch_no' => $no,
                 'message' => 'Dispatch ' . $no . ' opened. Scan every item before sending it.'];
         });
     }//open
@@ -115,6 +130,222 @@ class OrderDispatch extends Dbh
         });
     }//cancel
 
+    //The moment the goods leave. Everything below happens in one transaction, or none of it:
+    //the stickers are claimed, the warehouse's batches are drawn down oldest first, the sale is
+    //costed against the shop's invoice, and the order's lines move on.
+    public function complete($dispatch_id, $shop_id, $user_id, array $decisions)
+    {
+        return $this->transaction(function() use ($dispatch_id, $shop_id, $user_id, $decisions) {
+            $dispatch = $this->lock($dispatch_id, $shop_id);
+            $this->orders->requireProcessRight($user_id, $shop_id);
+            if((int)$dispatch['DispatchStat'] !== self::OPEN)
+            {
+                throw new CustomerOrderRefused(409, 'Dispatch ' . $dispatch['DispatchNo'] . ' has already been sent.');
+            }
+            if($dispatch['InvoiceHeader_IHID'] !== null && (int)$dispatch['InvStat'] !== 1)
+            {
+                throw new CustomerOrderRefused(409, 'Invoice ' . $dispatch['InvoiceNo']
+                    . ' was cancelled. Nothing on this order should be sent.');
+            }//the sale was returned in the meantime
+
+            $short = [];
+            foreach($this->linesOf($dispatch) as $line)
+            {
+                if((float)$line['Outstanding'] > 0)
+                {
+                    $short[] = $line['Description'] . ' (' . WarehouseOrder::qtyText($line['Outstanding']) . ' not scanned)';
+                }
+            }//everything on this trip must have been scanned
+            if(!empty($short))
+            {
+                throw new CustomerOrderRefused(422, 'Scan every item first: ' . implode(', ', $short) . '.');
+            }
+
+            $balance = (float)$dispatch['CustBalance'];
+            if($balance > 0 && empty($decisions['confirm_balance']))
+            {
+                throw new CustomerOrderRefused(409, 'The customer still owes Rs. '
+                    . number_format($balance, 2) . ' on invoice ' . $dispatch['InvoiceNo'] . '. Send it anyway?');
+            }//delivery on balance payment is normal here, but somebody says so out loud
+
+            $scanned = $this->scannedLines($dispatch_id);
+            if(empty($scanned))
+            {
+                throw new CustomerOrderRefused(422, 'Nothing has been scanned into this dispatch.');
+            }
+
+            $this->claimUnits($dispatch_id, $user_id);
+            $this->takeStock($dispatch, $scanned, $shop_id);
+            $this->advanceLines($scanned);
+
+            $this->connect()->prepare("UPDATE orderdispatches SET DispatchStat = ?, SentBy = ?, SentAt = ? WHERE DSID = ?;")
+                ->execute([self::SENT, (int)$user_id, date('Y-m-d H:i:s'), (int)$dispatch_id]);
+            $this->orders->refreshStatus($dispatch['customerorders_COID']);
+
+            return ['message' => 'Dispatch ' . $dispatch['DispatchNo'] . ' is on its way to ' . $dispatch['CustName'] . '.'];
+        });
+    }//complete
+
+    //It reached the customer. Only then is the order finished - paying for it never was.
+    public function delivered($dispatch_id, $shop_id, $user_id, $note)
+    {
+        return $this->transaction(function() use ($dispatch_id, $shop_id, $user_id, $note) {
+            $dispatch = $this->lock($dispatch_id, $shop_id);
+            $this->orders->requireProcessRight($user_id, $shop_id);
+            if((int)$dispatch['DispatchStat'] !== self::SENT)
+            {
+                throw new CustomerOrderRefused(409, 'Dispatch ' . $dispatch['DispatchNo'] . ' has not been sent yet.');
+            }
+
+            foreach($this->scannedLines($dispatch_id) as $line_id => $qty)
+            {
+                $this->connect()->prepare("UPDATE customerorderlines
+                    SET DeliveredQty = DeliveredQty + ?,
+                        LineStat = CASE WHEN DeliveredQty + ? >= Qty THEN ? ELSE LineStat END
+                    WHERE COLID = ?;")
+                    ->execute([$qty, $qty, WarehouseOrder::LINE_DELIVERED, (int)$line_id]);
+            }//each line this trip carried
+
+            $this->connect()->prepare("UPDATE orderdispatches SET DeliveredBy = ?, DeliveredAt = ?,
+                DeliveryNote = ? WHERE DSID = ?;")
+                ->execute([(int)$user_id, date('Y-m-d H:i:s'),
+                    trim((string)$note) === '' ? null : mb_substr(trim((string)$note), 0, 500), (int)$dispatch_id]);
+            $this->orders->refreshStatus($dispatch['customerorders_COID']);
+
+            return ['message' => 'Dispatch ' . $dispatch['DispatchNo'] . ' reached the customer.'];
+        });
+    }//delivered
+
+    // ---- what completing actually does ------------------------------------------------------------
+
+    //what was scanned into this dispatch: order line id => quantity
+    private function scannedLines($dispatch_id)
+    {
+        //plan rows carry no quantity of their own, so only real scans count here
+        $stmt = $this->connect()->prepare("SELECT customerorderlines_COLID, SUM(Qty) AS Qty
+            FROM orderdispatchlines WHERE orderdispatches_DSID = ? AND PlannedQty IS NULL
+            GROUP BY customerorderlines_COLID HAVING SUM(Qty) > 0;");
+        $stmt->execute([(int)$dispatch_id]);
+        $lines = [];
+        foreach($stmt->fetchAll(PDO::FETCH_ASSOC) as $row)
+        {
+            $lines[(int)$row['customerorderlines_COLID']] = (float)$row['Qty'];
+        }
+        return $lines;
+    }//scanned lines
+
+    //Claims every sticker on this dispatch. A unit already claimed by somebody else - whose
+    //screen was built a moment earlier - loses here, whatever its preview said.
+    private function claimUnits($dispatch_id, $user_id)
+    {
+        $stmt = $this->connect()->prepare("SELECT productunits_PUID, UnitBarcode FROM orderdispatchlines
+            WHERE orderdispatches_DSID = ? AND productunits_PUID IS NOT NULL;");
+        $stmt->execute([(int)$dispatch_id]);
+        $units = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if(empty($units))
+        {
+            return;
+        }
+
+        $claim = $this->connect()->prepare("UPDATE productunits SET UnitStat = ?, orderdispatches_DSID = ?,
+            DispatchedAt = NOW(), DispatchedBy = ? WHERE PUID = ? AND UnitStat IN (?, ?);");
+        foreach($units as $unit)
+        {
+            $claim->execute([ProductUnits::DISPATCHED, (int)$dispatch_id, (int)$user_id, (int)$unit['productunits_PUID'],
+                ProductUnits::PRINTED, ProductUnits::RECEIVED]);
+            if($claim->rowCount() !== 1)
+            {
+                throw new CustomerOrderRefused(409, $unit['UnitBarcode']
+                    . ' has just gone out on another dispatch. Check the list again.');
+            }
+        }//each sticker
+    }//claim units
+
+    //Draws the goods off the warehouse's own batches, oldest first, and costs them against the
+    //shop's invoice - the sale is the shop's, the stock was the warehouse's.
+    private function takeStock(array $dispatch, array $scanned, $shop_id)
+    {
+        $wanted = [];
+        $names = [];
+        foreach($this->orders->linesOf($dispatch['customerorders_COID']) as $line)
+        {
+            if(!isset($scanned[(int)$line['COLID']]) || $line['SupplierProductID'] === null)
+            {
+                continue;
+            }//not on this trip, or custom-made and never in stock
+            $product_id = (int)$line['SupplierProductID'];
+            $wanted[$product_id] = (isset($wanted[$product_id]) ? $wanted[$product_id] : 0) + $scanned[(int)$line['COLID']];
+            $names[$product_id] = $line['Description'];
+        }//each product this trip takes
+
+        $taken = $this->stockOnOpenTransfers($shop_id);
+        $parts = [];
+        foreach($wanted as $product_id => $qty)
+        {
+            $allocation = $this->allocator->allocate($product_id, $shop_id, $qty, $taken);
+            if($allocation['short'] > 0)
+            {
+                throw new CustomerOrderRefused(409, 'There is not enough ' . $names[$product_id]
+                    . ' in stock any more (' . WarehouseOrder::qtyText($allocation['short'])
+                    . ' short). Nothing was sent.');
+            }//somebody else took it between scanning and sending
+            foreach($allocation['parts'] as $part)
+            {
+                $parts[] = ['product_id' => $product_id] + $part;
+                $already = isset($taken[$part['inventory_id']]) ? $taken[$part['inventory_id']]['qty'] : 0;
+                $taken[$part['inventory_id']] = ['tdid' => null, 'qty' => $already + $part['qty']];
+            }
+        }//each product
+
+        $move = $this->connect()->prepare("UPDATE inventory SET CurrentQty = CurrentQty - ?, BillQty = BillQty + ?
+            WHERE INID = ? AND CurrentQty >= ?;");
+        $cost = $this->connect()->prepare("INSERT INTO inventory_consumption (invoice_headerID, status, inventory_INID,
+            price, sold_price, `batch No`, product_PDID, quantity, shop_SHID) VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?);");
+        $stamp = $this->connect()->prepare("UPDATE orderdispatchlines SET InventoryID = ?, Batch_ID = ?
+            WHERE orderdispatches_DSID = ? AND products_PDID = ? AND InventoryID IS NULL LIMIT 1;");
+        foreach($parts as $part)
+        {
+            $move->execute([$part['qty'], $part['qty'], $part['inventory_id'], $part['qty']]);
+            if($move->rowCount() !== 1)
+            {
+                throw new CustomerOrderRefused(409, 'The stock moved while this was being sent. Nothing was sent.');
+            }//another sale emptied the batch a moment ago
+            $cost->execute([$dispatch['InvoiceHeader_IHID'], $part['inventory_id'], $part['purchase'],
+                $part['selling'], (int)preg_replace('/\D/', '', (string)$part['batch_id']),
+                $part['product_id'], $part['qty'], (int)$shop_id]);
+            $stamp->execute([$part['inventory_id'], $part['batch_id'], (int)$dispatch['DSID'], $part['product_id']]);
+        }//each batch this trip drew on
+    }//take stock
+
+    //stock this shop has already promised to other open transfers is not sold twice
+    private function stockOnOpenTransfers($shop_id)
+    {
+        $stmt = $this->connect()->prepare("SELECT td.InventoryID, SUM(td.TransferQty) AS Qty FROM transferdetails td
+            INNER JOIN transferheader th ON th.THID = td.TransferHeader_THID
+            WHERE th.TransferFrom = ? AND th.TransferStat IN (0, 1) GROUP BY td.InventoryID;");
+        $stmt->execute([(int)$shop_id]);
+        $taken = [];
+        foreach($stmt->fetchAll(PDO::FETCH_ASSOC) as $row)
+        {
+            $taken[(int)$row['InventoryID']] = ['tdid' => null, 'qty' => (float)$row['Qty']];
+        }
+        return $taken;
+    }//stock on open transfers
+
+    //a line that has now sent everything it owed is Dispatched; a part-sent one keeps its state
+    //for the remainder
+    private function advanceLines(array $scanned)
+    {
+        $stmt = $this->connect()->prepare("UPDATE customerorderlines
+            SET DispatchedQty = DispatchedQty + ?,
+                LineStat = CASE WHEN DispatchedQty + ? >= Qty THEN ? ELSE ? END
+            WHERE COLID = ?;");
+        foreach($scanned as $line_id => $qty)
+        {
+            $stmt->execute([$qty, $qty, WarehouseOrder::LINE_DISPATCHED, WarehouseOrder::LINE_PENDING, (int)$line_id]);
+        }
+    }//advance lines
+
     // ---- reading ---------------------------------------------------------------------------------
 
     //The dispatch, its order, and one row per line it has to send with what is still needed on it.
@@ -128,24 +359,24 @@ class OrderDispatch extends Dbh
     //scanned into this dispatch so far, and what is therefore still needed.
     public function linesOf(array $dispatch)
     {
+        //the plan rows written when the dispatch was opened ARE the list of what it must carry
         $stmt = $this->connect()->prepare("SELECT l.*, p.Barcode AS SupplierBarcode, p.ItemName AS SupplierItemName,
-            COALESCE(scanned.Qty, 0) AS ScannedQty
-            FROM customerorderlines l
+            plan.PlannedQty, COALESCE(scanned.Qty, 0) AS ScannedQty
+            FROM orderdispatchlines plan
+            INNER JOIN customerorderlines l ON l.COLID = plan.customerorderlines_COLID
             LEFT JOIN products p ON p.PDID = l.SupplierProductID
             LEFT JOIN (SELECT customerorderlines_COLID, SUM(Qty) AS Qty FROM orderdispatchlines
-                       WHERE orderdispatches_DSID = ? GROUP BY customerorderlines_COLID) scanned
+                       WHERE orderdispatches_DSID = ? AND PlannedQty IS NULL GROUP BY customerorderlines_COLID) scanned
                 ON scanned.customerorderlines_COLID = l.COLID
-            WHERE l.customerorders_COID = ? AND l.LineSource = 'WAREHOUSE'
-              AND (l.LineStat = ? OR COALESCE(scanned.Qty, 0) > 0)
+            WHERE plan.orderdispatches_DSID = ? AND plan.PlannedQty IS NOT NULL
             ORDER BY l.SortOrder, l.COLID;");
-        $stmt->execute([(int)$dispatch['DSID'], (int)$dispatch['customerorders_COID'], WarehouseOrder::LINE_READY]);
+        $stmt->execute([(int)$dispatch['DSID'], (int)$dispatch['DSID']]);
 
         $lines = $stmt->fetchAll(PDO::FETCH_ASSOC);
         foreach($lines as &$line)
         {
-            $owed = (float)$line['Qty'] - (float)$line['DispatchedQty'];
-            $line['Needed'] = max(0, $owed);
-            $line['Outstanding'] = max(0, $owed - (float)$line['ScannedQty']);
+            $line['Needed'] = max(0, (float)$line['PlannedQty']);
+            $line['Outstanding'] = max(0, $line['Needed'] - (float)$line['ScannedQty']);
             $line['IsCustom'] = $line['SupplierProductID'] === null;
         }
         unset($line);

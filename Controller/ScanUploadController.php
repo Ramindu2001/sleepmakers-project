@@ -43,7 +43,7 @@ function scan_public_preview(?array $preview)
     unset($preview['groups']);
     foreach($preview['lines'] as &$line)
     {
-        unset($line['parts']);
+        unset($line['parts'], $line['unit_codes']);
     }
     unset($line);
     return $preview;

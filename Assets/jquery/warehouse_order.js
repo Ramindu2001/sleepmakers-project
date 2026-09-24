@@ -21,6 +21,14 @@ $(function () {
             if (xhr.responseJSON && xhr.responseJSON.message) {
                 message = xhr.responseJSON.message;
             }
+            // The customer still owes something. Delivering on balance payment is normal here,
+            // so it is a question, not a wall - but somebody has to answer it.
+            if (xhr.status === 409 && fields.action === "complete_dispatch" && !fields.confirm_balance) {
+                if (confirm(message)) {
+                    post($.extend({}, fields, { confirm_balance: 1 }), button);
+                }
+                return;
+            }
             if (typeof toastr !== "undefined") {
                 toastr.error(message, "Not done");
             } else {
@@ -46,10 +54,34 @@ $(function () {
             fields.reason = reason;
         }
 
+        if (button.data("dispatch")) {
+            fields.id = button.data("dispatch");
+        }//dispatch actions name the trip, not the order
+
+        if (button.data("ask-note")) {
+            var note = prompt(button.data("ask-note"), "");
+            if (note === null) {
+                return;
+            }
+            fields.note = note;
+        }
+
         if (button.data("confirm") && !confirm(button.data("confirm"))) {
             return;
         }
 
         post(fields, button);
+    });
+
+    $("body").on("click", "#wo_scan", function () {
+        var modal = document.getElementById("scan_upload_modal");
+        if (modal) {
+            bootstrap.Modal.getOrCreateInstance(modal).show();
+        }
+    });
+
+    // the scanner dialog reloads the page once its items are in the dispatch
+    $(document).on("scanupload:applied", function () {
+        window.location.reload();
     });
 });

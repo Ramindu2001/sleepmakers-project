@@ -33,6 +33,7 @@ if($_SERVER['REQUEST_METHOD'] !== 'POST' || !csrf_validate(isset($_POST['csrf_to
 }//not a post from our page
 
 $orders = new WarehouseOrder();
+$dispatches = new OrderDispatch();
 $user_id = (int)$_SESSION['user_id'];
 $shop_id = (int)$_SESSION['shop_id'];
 $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
@@ -62,6 +63,28 @@ try
 
         case 'cancel_order':
             $result = $orders->cancel($id, $shop_id, $user_id);
+            wo_done($result['message']);
+            break;
+
+        //the dispatch actions name the trip in `id`, not the order
+        case 'open_dispatch':
+            $result = $dispatches->open($id, $shop_id, $user_id);
+            wo_done($result['message'], ['dispatch_id' => $result['dispatch_id']]);
+            break;
+
+        case 'cancel_dispatch':
+            $result = $dispatches->cancel($id, $shop_id, $user_id);
+            wo_done($result['message']);
+            break;
+
+        case 'complete_dispatch':
+            $result = $dispatches->complete($id, $shop_id, $user_id,
+                ['confirm_balance' => !empty($_POST['confirm_balance'])]);
+            wo_done($result['message']);
+            break;
+
+        case 'delivered':
+            $result = $dispatches->delivered($id, $shop_id, $user_id, $field('note'));
             wo_done($result['message']);
             break;
 

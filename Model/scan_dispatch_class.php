@@ -226,6 +226,7 @@ class DispatchScan extends ScanDocument
             'can_leave_out' => true,
             'editable' => false,
             'line_id' => null,
+            'outstanding' => null,
             'unit_codes' => $group['units'],
         ];
 
@@ -244,6 +245,7 @@ class DispatchScan extends ScanDocument
         $order_line = $byProduct[(int)$product_id];
         $line['line_id'] = (int)$order_line['COLID'];
         $outstanding = (float)$order_line['Outstanding'];
+        $line['outstanding'] = self::number(max(0, $outstanding - $group['qty']));
         if($group['qty'] > $outstanding)
         {
             $line['status'] = 'error';

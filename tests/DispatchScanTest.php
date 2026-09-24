@@ -246,7 +246,9 @@ final class DispatchScanTest extends DatabaseTestCase
 
         $this->scan()->apply($dispatch, $this->warehouse, $this->picker, $code, []);
 
-        $stmt = $this->pdo->prepare('SELECT UnitBarcode, productunits_PUID FROM orderdispatchlines WHERE orderdispatches_DSID = ?');
+        //PlannedQty marks the row written when the dispatch was opened; the scans are the rest
+        $stmt = $this->pdo->prepare('SELECT UnitBarcode, productunits_PUID FROM orderdispatchlines
+            WHERE orderdispatches_DSID = ? AND PlannedQty IS NULL');
         $stmt->execute([$dispatch]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         $this->assertSame($code, $row['UnitBarcode']);
@@ -357,4 +359,188 @@ final class DispatchScanTest extends DatabaseTestCase
         $this->expectException(ScanRefused::class);
         $this->scan()->preview($dispatch, $this->warehouse, $outsider, 'COO00001');
     }//no right, no scanning
+
+    // ---- sending it -------------------------------------------------------------------------------
+
+    public function test_completing_a_dispatch_takes_the_stock_and_marks_the_line()
+    {
+        $dispatch = $this->openDispatch();
+        $this->scan()->apply($dispatch, $this->warehouse, $this->picker, 'COO00001', []);
+        $before = $this->stockOf($this->bedThere);
+
+        $this->dispatches->complete($dispatch, $this->warehouse, $this->picker, ['confirm_balance' => 1]);
+
+        $this->assertSame($before - 1, $this->stockOf($this->bedThere));
+        $this->assertSame(WarehouseOrder::LINE_DISPATCHED, $this->lineStatusOf($this->lineId));
+        $this->assertSame(WarehouseOrder::DISPATCHED, $this->statusOf($this->orderId));
+    }//completing takes the stock
+
+    public function test_the_sale_is_costed_against_the_shops_invoice()
+    {
+        $dispatch = $this->openDispatch();
+        $this->scan()->apply($dispatch, $this->warehouse, $this->picker, 'COO00001', []);
+
+        $this->dispatches->complete($dispatch, $this->warehouse, $this->picker, ['confirm_balance' => 1]);
+
+        $row = $this->pdo->query('SELECT invoice_headerID, shop_SHID, quantity, product_PDID
+            FROM inventory_consumption')->fetch(PDO::FETCH_ASSOC);
+        //the money belongs to the shop's invoice; the goods came off the warehouse's shelf
+        $this->assertSame([$this->invoiceId, $this->warehouse, 1.0, $this->bedThere],
+            [(int) $row['invoice_headerID'], (int) $row['shop_SHID'], (float) $row['quantity'],
+                (int) $row['product_PDID']]);
+    }//costed against the shop's invoice
+
+    public function test_the_shops_own_stock_is_never_touched()
+    {
+        $this->addStock($this->bedHere, $this->shop, 4, 'S1', 100, 150);
+        $dispatch = $this->openDispatch();
+        $this->scan()->apply($dispatch, $this->warehouse, $this->picker, 'COO00001', []);
+
+        $this->dispatches->complete($dispatch, $this->warehouse, $this->picker, ['confirm_balance' => 1]);
+
+        $this->assertSame(4.0, $this->stockOf($this->bedHere));
+    }//the shop's stock is untouched
+
+    public function test_a_half_scanned_dispatch_cannot_be_completed()
+    {
+        $dispatch = $this->openDispatch(2);
+        $this->scan()->apply($dispatch, $this->warehouse, $this->picker, 'COO00001', []);
+
+        try {
+            $this->dispatches->complete($dispatch, $this->warehouse, $this->picker, ['confirm_balance' => 1]);
+            $this->fail('a half scanned dispatch was sent');
+        } catch (CustomerOrderRefused $e) {
+            $this->assertSame(422, $e->status);
+        }
+        $this->assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM inventory_consumption')->fetchColumn());
+    }//half scanned
+
+    public function test_an_outstanding_balance_must_be_confirmed()
+    {
+        $dispatch = $this->openDispatch();
+        $this->scan()->apply($dispatch, $this->warehouse, $this->picker, 'COO00001', []);
+
+        try {
+            $this->dispatches->complete($dispatch, $this->warehouse, $this->picker, []);
+            $this->fail('expected the balance to be confirmed');
+        } catch (CustomerOrderRefused $e) {
+            $this->assertSame(409, $e->status);
+            $this->assertStringContainsString('600', $e->getMessage());
+        }
+
+        $this->dispatches->complete($dispatch, $this->warehouse, $this->picker, ['confirm_balance' => 1]);
+        $this->assertSame(WarehouseOrder::DISPATCHED, $this->statusOf($this->orderId));
+    }//a balance must be confirmed
+
+    public function test_a_paid_order_needs_no_confirmation()
+    {
+        $dispatch = $this->openDispatch();
+        $this->pdo->prepare('UPDATE invoiceheader SET CustPayment = 1000, CustBalance = 0 WHERE IHID = ?')
+            ->execute([$this->invoiceId]);
+        $this->scan()->apply($dispatch, $this->warehouse, $this->picker, 'COO00001', []);
+
+        $this->dispatches->complete($dispatch, $this->warehouse, $this->picker, []);
+
+        $this->assertSame(WarehouseOrder::DISPATCHED, $this->statusOf($this->orderId));
+    }//a paid order needs no confirmation
+
+    public function test_stock_that_went_between_scanning_and_completing_refuses_the_whole_dispatch()
+    {
+        $dispatch = $this->openDispatch();
+        $this->scan()->apply($dispatch, $this->warehouse, $this->picker, 'COO00001', []);
+        $this->pdo->prepare('UPDATE inventory SET CurrentQty = 0 WHERE products_PDID = ?')->execute([$this->bedThere]);
+
+        try {
+            $this->dispatches->complete($dispatch, $this->warehouse, $this->picker, ['confirm_balance' => 1]);
+            $this->fail('expected a refusal');
+        } catch (CustomerOrderRefused $e) {
+            $this->assertSame(409, $e->status);
+        }
+        $this->assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM inventory_consumption')->fetchColumn());
+        $this->assertSame(0.0, (float) $this->pdo->query('SELECT COALESCE(SUM(DispatchedQty), 0)
+            FROM customerorderlines')->fetchColumn());
+    }//stock that went in the meantime
+
+    public function test_a_dispatched_sticker_is_marked_as_gone()
+    {
+        $dispatch = $this->openDispatch();
+        $code = $this->printUnit();
+        $this->scan()->apply($dispatch, $this->warehouse, $this->picker, $code, []);
+
+        $this->dispatches->complete($dispatch, $this->warehouse, $this->picker, ['confirm_balance' => 1]);
+
+        $stmt = $this->pdo->prepare('SELECT UnitStat, orderdispatches_DSID FROM productunits WHERE UnitBarcode = ?');
+        $stmt->execute([$code]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $this->assertSame([ProductUnits::DISPATCHED, $dispatch],
+            [(int) $row['UnitStat'], (int) $row['orderdispatches_DSID']]);
+    }//a sticker is marked as gone
+
+    //two dispatchers race for the same sticker: the second one loses, whatever its preview said
+    public function test_a_sticker_can_only_be_completed_onto_one_dispatch()
+    {
+        $code = $this->printUnit();
+        $first = $this->openDispatch();
+        $this->scan()->apply($first, $this->warehouse, $this->picker, $code, []);
+        $second = $this->openDispatchOnAnotherOrder();
+        //the second picker's screen was built before the first one pressed send
+        $this->pdo->prepare("INSERT INTO orderdispatchlines (orderdispatches_DSID, customerorderlines_COLID,
+            products_PDID, Qty, UnitBarcode, productunits_PUID, ScannedAt, ScannedBy)
+            SELECT ?, (SELECT COLID FROM customerorderlines WHERE customerorders_COID =
+                (SELECT customerorders_COID FROM orderdispatches WHERE DSID = ?) AND LineSource = 'WAREHOUSE' LIMIT 1),
+                products_PDID, Qty, UnitBarcode, productunits_PUID, NOW(), ?
+            FROM orderdispatchlines WHERE orderdispatches_DSID = ?")
+            ->execute([$second, $second, $this->picker, $first]);
+
+        $this->dispatches->complete($first, $this->warehouse, $this->picker, ['confirm_balance' => 1]);
+
+        $this->expectException(CustomerOrderRefused::class);
+        $this->dispatches->complete($second, $this->warehouse, $this->picker, ['confirm_balance' => 1]);
+    }//one sticker, one dispatch
+
+    public function test_a_second_dispatch_sends_what_is_left()
+    {
+        //the van only has room for two of the three, so the trip is opened for two
+        $this->readyOrder(3);
+        $dispatch = $this->dispatches->open($this->orderId, $this->warehouse, $this->picker,
+            [['line_id' => $this->lineId, 'qty' => 2]])['dispatch_id'];
+        $this->scan()->apply($dispatch, $this->warehouse, $this->picker, "COO00001\nCOO00001", []);
+        $this->dispatches->complete($dispatch, $this->warehouse, $this->picker, ['confirm_balance' => 1]);
+
+        $this->orders->markReady($this->orderId, $this->warehouse, $this->picker);
+        $second = $this->dispatches->open($this->orderId, $this->warehouse, $this->picker)['dispatch_id'];
+
+        $lines = $this->dispatches->get($second, $this->warehouse)['lines'];
+        $this->assertSame(1.0, (float) $lines[0]['Needed']);
+    }//a second dispatch sends the rest
+
+    public function test_delivering_completes_the_order()
+    {
+        $dispatch = $this->openDispatch();
+        $this->scan()->apply($dispatch, $this->warehouse, $this->picker, 'COO00001', []);
+        $this->dispatches->complete($dispatch, $this->warehouse, $this->picker, ['confirm_balance' => 1]);
+
+        $this->dispatches->delivered($dispatch, $this->warehouse, $this->picker, 'Left with the customer');
+
+        $this->assertSame(WarehouseOrder::COMPLETED, $this->statusOf($this->orderId));
+        $this->assertSame(WarehouseOrder::LINE_DELIVERED, $this->lineStatusOf($this->lineId));
+    }//delivering completes the order
+
+    public function test_only_a_sent_dispatch_can_be_delivered()
+    {
+        $dispatch = $this->openDispatch();
+
+        $this->expectException(CustomerOrderRefused::class);
+        $this->dispatches->delivered($dispatch, $this->warehouse, $this->picker, '');
+    }//only a sent dispatch is delivered
+
+    public function test_a_sent_dispatch_cannot_be_cancelled()
+    {
+        $dispatch = $this->openDispatch();
+        $this->scan()->apply($dispatch, $this->warehouse, $this->picker, 'COO00001', []);
+        $this->dispatches->complete($dispatch, $this->warehouse, $this->picker, ['confirm_balance' => 1]);
+
+        $this->expectException(CustomerOrderRefused::class);
+        $this->dispatches->cancel($dispatch, $this->warehouse, $this->picker);
+    }//a sent dispatch stays sent
 }//DispatchScanTest

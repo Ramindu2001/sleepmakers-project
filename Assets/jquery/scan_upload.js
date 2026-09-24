@@ -25,7 +25,8 @@
             return c.concat(['Status', '']);
         },
         transfer_send: function () { return ['Barcode', 'Product', 'Qty', 'In Stock', 'Batches', 'Status', '']; },
-        transfer_receive: function () { return ['Barcode', 'Product', 'Sent', 'Scanned', 'Received', 'Status', '']; }
+        transfer_receive: function () { return ['Barcode', 'Product', 'Sent', 'Scanned', 'Received', 'Status', '']; },
+        dispatch: function () { return ['Barcode', 'Item', 'Scanned', 'Still needed', 'Status', '']; }
     };
 
     function esc(value) {
@@ -240,6 +241,8 @@
             cells.push(num(line.qty), num(line.available), '<td>' + esc((line.batches || []).map(function (b) {
                 return b.batch_id + ' × ' + b.qty;
             }).join(', ')) + '</td>');
+        } else if (context === 'dispatch') {
+            cells.push(num(line.qty), num(line.outstanding));
         } else {
             cells.push(num(line.sent), num(line.qty), num(line.received));
         }
