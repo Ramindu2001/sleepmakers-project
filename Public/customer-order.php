@@ -14,7 +14,7 @@ $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
 try
 {
-    $view = $orders->get($id, $shop_id, $me);
+    $orderView = $orders->get($id, $shop_id, $me);
 }
 catch(CustomerOrderRefused $e)
 {
@@ -23,9 +23,9 @@ catch(CustomerOrderRefused $e)
     exit;
 }//not this shop's order, or no right
 
-$order = $view['order'];
-$lines = $view['lines'];
-$money = $view['money'];
+$order = $orderView['order'];
+$lines = $orderView['lines'];
+$money = $orderView['money'];
 $isSupplier = (int)$order['SupplierShopID'] === (int)$shop_id;
 $isOurs = (int)$order['shop_SHID'] === (int)$shop_id;
 $canProcess = $isSupplier && $orders->can($me, $shop_id, WarehouseOrder::PROCESS);
@@ -179,7 +179,7 @@ if($openDispatch !== null)
                         </div>
                     </div>
 
-                    <?php if(!empty($view['dispatches'])) { ?>
+                    <?php if(!empty($orderView['dispatches'])) { ?>
                     <div class="card mb-3">
                         <div class="card-body">
                             <h6 class="fw-semibold mb-3">Dispatches</h6>
@@ -189,7 +189,7 @@ if($openDispatch !== null)
                                         <tr><th>No</th><th>Items scanned</th><th>State</th><th>Sent</th><th>Delivered</th></tr>
                                     </thead>
                                     <tbody>
-                                        <?php foreach($view['dispatches'] as $dispatch) { ?>
+                                        <?php foreach($orderView['dispatches'] as $dispatch) { ?>
                                         <tr>
                                             <td><b><?= wo_h($dispatch['DispatchNo']) ?></b></td>
                                             <td><?= (int)$dispatch['ScannedCount'] ?></td>
@@ -232,7 +232,7 @@ if($openDispatch !== null)
                         <?php if($canProcess && $open && $anyReady && $openDispatch === null) { ?>
                         <button class="btn btn-primary wo-action" data-action="open_dispatch">Start a dispatch</button>
                         <?php } ?>
-                        <?php foreach($view['dispatches'] as $sent) {
+                        <?php foreach($orderView['dispatches'] as $sent) {
                             if((int)$sent['DispatchStat'] !== OrderDispatch::SENT || $sent['DeliveredAt'] !== null) { continue; } ?>
                         <button class="btn btn-success wo-action" data-action="delivered" data-dispatch="<?= (int)$sent['DSID'] ?>"
                             data-ask-note="Who took it, and any note about the delivery?">
