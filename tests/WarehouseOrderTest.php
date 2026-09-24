@@ -103,4 +103,143 @@ final class WarehouseOrderTest extends DatabaseTestCase
         $this->assertCount(1, $ours);
         $this->assertSame(1, $this->orders->pendingCount($this->warehouse));
     }//the warehouse queue
+
+    // ---- what a sale leaves behind -----------------------------------------------------------
+
+    public function test_a_sale_leaves_the_warehouse_lines_pending_and_the_given_ones_given()
+    {
+        $view = $this->orders->get($this->order()['order_id'], $this->warehouse, $this->picker);
+
+        $this->assertSame([WarehouseOrder::LINE_GIVEN, WarehouseOrder::LINE_PENDING],
+            array_map('intval', array_column($view['lines'], 'LineStat')));
+        $this->assertSame(WarehouseOrder::PENDING, (int) $view['order']['OrderStat']);
+    }//warehouse lines pending, given lines given
+
+    public function test_the_order_is_numbered_per_shop()
+    {
+        $this->assertSame('CO_000001', $this->order()['order_no']);
+        $this->assertSame('CO_000002', $this->order()['order_no']);
+    }//numbered per shop
+
+    public function test_a_line_keeps_the_shop_copy_and_the_warehouse_product_apart()
+    {
+        $lines = $this->orders->get($this->order()['order_id'], $this->warehouse, $this->picker)['lines'];
+
+        $this->assertSame([$this->bedHere, $this->bedThere],
+            [(int) $lines[1]['products_PDID'], (int) $lines[1]['SupplierProductID']]);
+    }//both product ids kept apart
+
+    public function test_the_line_remembers_what_the_customer_was_billed()
+    {
+        $lines = $this->orders->get($this->order()['order_id'], $this->warehouse, $this->picker)['lines'];
+
+        $this->assertSame([800.0, 800.0], [(float) $lines[1]['UnitPrice'], (float) $lines[1]['LineTotal']]);
+    }//the line remembers the price
+
+    //the shop had 1 of 2 beds, so the bed is on the cart twice - once given, once ordered
+    public function test_the_same_product_given_and_ordered_stays_two_lines()
+    {
+        $id = $this->order([
+            ['source' => 'GIVEN', 'product_id' => $this->bedHere, 'supplier_product_id' => null,
+                'description' => 'Cooler Bed', 'qty' => 1, 'notes' => '', 'unit_price' => 800],
+            ['source' => 'WAREHOUSE', 'product_id' => $this->bedHere, 'supplier_product_id' => $this->bedThere,
+                'description' => 'Cooler Bed', 'qty' => 1, 'notes' => '', 'unit_price' => 800],
+        ])['order_id'];
+
+        $lines = $this->orders->get($id, $this->warehouse, $this->picker)['lines'];
+
+        $this->assertCount(2, $lines);
+        $this->assertSame([1, 1], array_map(function ($line) { return (int) $line['Qty']; }, $lines));
+        $this->assertSame([WarehouseOrder::LINE_GIVEN, WarehouseOrder::LINE_PENDING],
+            array_map('intval', array_column($lines, 'LineStat')));
+    }//given and ordered stay two lines
+
+    public function test_a_custom_made_line_has_no_product()
+    {
+        $id = $this->order([
+            ['source' => 'WAREHOUSE', 'product_id' => null, 'supplier_product_id' => null,
+                'description' => 'Headboard, walnut, 6ft', 'qty' => 1, 'notes' => 'Buttoned', 'unit_price' => 45000],
+        ])['order_id'];
+
+        $line = $this->orders->get($id, $this->warehouse, $this->picker)['lines'][0];
+
+        $this->assertNull($line['products_PDID']);
+        $this->assertSame(['Headboard, walnut, 6ft', 'Buttoned'], [$line['Description'], $line['Notes']]);
+    }//a custom made line
+
+    public function test_a_sale_with_nothing_for_the_warehouse_makes_no_order()
+    {
+        $this->expectException(CustomerOrderRefused::class);
+        $this->order([['source' => 'GIVEN', 'product_id' => $this->sheetHere, 'supplier_product_id' => null,
+            'description' => 'Bedsheet', 'qty' => 1, 'notes' => '', 'unit_price' => 100]]);
+    }//nothing for the warehouse
+
+    public function test_the_customer_name_and_phone_are_required()
+    {
+        foreach (['cust_name', 'cust_phone'] as $field) {
+            try {
+                $this->order(null, [$field => '   ']);
+                $this->fail('expected a refusal for ' . $field);
+            } catch (CustomerOrderRefused $e) {
+                $this->assertSame(422, $e->status);
+            }
+        }//each required field
+    }//name and phone required
+
+    public function test_a_delivery_address_is_required_unless_the_customer_collects()
+    {
+        try {
+            $this->order(null, ['delivery_address' => '']);
+            $this->fail('expected a refusal');
+        } catch (CustomerOrderRefused $e) {
+            $this->assertSame(422, $e->status);
+        }
+
+        $id = $this->order(null, ['delivery_address' => '', 'deliver_to' => WarehouseOrder::DELIVER_PICKUP])['order_id'];
+
+        $this->assertSame(WarehouseOrder::DELIVER_PICKUP,
+            (int) $this->orders->get($id, $this->shop, $this->cashier)['order']['DeliverTo']);
+    }//address required unless collecting
+
+    public function test_a_line_for_a_product_the_supplier_does_not_own_is_refused()
+    {
+        $this->expectException(CustomerOrderRefused::class);
+        $this->order([['source' => 'WAREHOUSE', 'product_id' => $this->bedHere,
+            'supplier_product_id' => $this->sheetHere, 'description' => 'Bedsheet', 'qty' => 1,
+            'notes' => '', 'unit_price' => 100]]);
+    }//a product the supplier does not own
+
+    public function test_a_service_item_cannot_be_ordered_from_the_warehouse()
+    {
+        $service = $this->createProduct($this->warehouse, 'SRV00001', 'Delivery charge', ['ItemType' => 'S']);
+
+        $this->expectException(CustomerOrderRefused::class);
+        $this->order([['source' => 'WAREHOUSE', 'product_id' => $this->bedHere,
+            'supplier_product_id' => $service, 'description' => 'Delivery charge', 'qty' => 1,
+            'notes' => '', 'unit_price' => 100]]);
+    }//a service item cannot be ordered
+
+    public function test_a_shop_of_another_company_cannot_be_the_supplier()
+    {
+        $stranger = $this->createShop($this->createCompany(), ['ShopName' => 'Another company']);
+
+        $this->expectException(CustomerOrderRefused::class);
+        $this->order(null, ['supplier_shop_id' => $stranger]);
+    }//supplier must be our own company
+
+    public function test_a_quantity_that_is_not_a_sensible_number_is_refused()
+    {
+        foreach ([0, -1, 100000, 'two'] as $qty) {
+            try {
+                $this->order([['source' => 'WAREHOUSE', 'product_id' => $this->bedHere,
+                    'supplier_product_id' => $this->bedThere, 'description' => 'Cooler Bed',
+                    'qty' => $qty, 'notes' => '', 'unit_price' => 800]]);
+                $this->fail('expected a refusal for quantity ' . $qty);
+            } catch (CustomerOrderRefused $e) {
+                $this->assertSame(422, $e->status);
+            }
+        }//each impossible quantity
+
+        $this->assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM customerorders')->fetchColumn());
+    }//impossible quantities
 }//WarehouseOrderTest

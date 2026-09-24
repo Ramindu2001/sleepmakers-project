@@ -194,6 +194,10 @@ class WarehouseOrder extends Dbh
         {
             throw new CustomerOrderRefused(422, 'Every line needs a description.');
         }
+        if($source === 'WAREHOUSE' && !empty($line['supplier_product_id']))
+        {
+            $this->requireSupplierProduct($line['supplier_product_id'], $supplier, $description);
+        }//a catalog line: it must be something that shop really sells
 
         return [
             'source' => $source,
@@ -206,6 +210,32 @@ class WarehouseOrder extends Dbh
                 ? mb_substr(trim((string)$line['notes']), 0, 255) : null,
         ];
     }//validate line
+
+    //A line the warehouse is expected to pick must name a product that shop really keeps: its
+    //own, still active, and a stock item rather than a service. A held bill recalled days later
+    //comes back through here, so a product switched off in the meantime is caught at checkout
+    //instead of becoming a job nobody can fill.
+    private function requireSupplierProduct($product_id, array $supplier, $description)
+    {
+        $stmt = $this->connect()->prepare("SELECT PDID, ItemName, ItemType, ProductStat FROM products
+            WHERE PDID = ? AND shop_SHID = ?;");
+        $stmt->execute([(int)$product_id, (int)$supplier['SHID']]);
+        $product = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if($product === false)
+        {
+            throw new CustomerOrderRefused(422, $description . ' is not a product ' . $supplier['ShopName'] . ' keeps.');
+        }
+        if((int)$product['ProductStat'] !== 1)
+        {
+            throw new CustomerOrderRefused(422, $product['ItemName'] . ' is no longer sold at ' . $supplier['ShopName'] . '.');
+        }
+        if((string)$product['ItemType'] !== 'P')
+        {
+            throw new CustomerOrderRefused(422, $product['ItemName'] . ' is a service, so the warehouse cannot send it.');
+        }
+        return $product;
+    }//require supplier product
 
     //the shop asked to supply this order: another active shop of the same company
     private function supplierShopRow($shop_id, $supplier_shop_id)
