@@ -27,6 +27,10 @@ db/*
 !db/unit_barcodes_install.php
 !db/unit_barcodes.sql
 !db/UNIT_BARCODES_MODULE.md
+!db/warehouse_fulfilment_migration.php
+!db/warehouse_fulfilment_install.php
+!db/warehouse_fulfilment.sql
+!db/WAREHOUSE_FULFILMENT_MODULE.md
 /*.sql
 
 .env
