@@ -228,3 +228,100 @@ CREATE TABLE `barcodesequence` (
   PRIMARY KEY (`BQID`),
   UNIQUE KEY `uq_barcodesequence` (`shop_SHID`,`ScopeKey`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+
+-- Selling: the POS invoice, its lines, what each sale took out of stock, and the customer.
+-- Foreign keys are left off, as elsewhere in these fixtures, so a test can insert one row
+-- without building the whole company around it.
+CREATE TABLE `customers` (
+  `CTID` int(11) NOT NULL AUTO_INCREMENT,
+  `CustomerNo` varchar(12) DEFAULT NULL,
+  `CustName` varchar(120) DEFAULT NULL,
+  `CustGender` int(11) NOT NULL DEFAULT 1,
+  `CustDOB` date DEFAULT NULL,
+  `CustAddress` varchar(255) DEFAULT NULL,
+  `CustContact` varchar(12) DEFAULT NULL,
+  `MaxCreditAmount` decimal(12,2) DEFAULT 100000.00,
+  `PaymentTerm` int(11) DEFAULT NULL,
+  `CustStat` int(11) DEFAULT NULL,
+  `shop_SHID` int(11) NOT NULL,
+  PRIMARY KEY (`CTID`),
+  KEY `fk_Customers_shop1_idx` (`shop_SHID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `invoiceheader` (
+  `IHID` int(11) NOT NULL AUTO_INCREMENT,
+  `InvoiceNo` varchar(12) DEFAULT NULL,
+  `Inv_Type` int(11) NOT NULL DEFAULT 1,
+  `EffectiveDate` date DEFAULT NULL,
+  `BillNo` varchar(12) DEFAULT NULL,
+  `InvStartTime` datetime DEFAULT NULL,
+  `InvEndTime` datetime DEFAULT NULL,
+  `InvItemCount` int(11) DEFAULT NULL,
+  `GrossAmount` decimal(12,2) DEFAULT NULL,
+  `lineDiscount` float(10,2) DEFAULT 0.00,
+  `PercentDiscount` decimal(12,2) DEFAULT 0.00,
+  `FixedDiscount` decimal(12,2) DEFAULT 0.00,
+  `DiscountAmount` decimal(12,2) DEFAULT NULL,
+  `discountType` int(11) NOT NULL DEFAULT 1,
+  `deliveryCharge` float(10,2) NOT NULL DEFAULT 0.00,
+  `otherCharge` float(10,2) NOT NULL DEFAULT 0.00,
+  `excessAmount` float(10,2) DEFAULT 0.00,
+  `returnAmount` float(10,2) DEFAULT 0.00,
+  `NetAmount` decimal(12,2) DEFAULT NULL,
+  `CustPayment` decimal(12,2) DEFAULT NULL,
+  `CustBalance` decimal(12,2) DEFAULT NULL,
+  `InvStat` tinyint(4) DEFAULT NULL,
+  `remarks` text DEFAULT NULL,
+  `user_USID` int(11) NOT NULL,
+  `customers_CTID` int(11) DEFAULT NULL,
+  `Salesmans_SLID` int(11) NOT NULL DEFAULT 0,
+  `ReturnHeader_RHID` int(11) DEFAULT NULL,
+  `shop_SHID` int(11) NOT NULL,
+  `CashCounter_CCID` int(11) NOT NULL DEFAULT 0,
+  `print_count` int(11) NOT NULL DEFAULT 1,
+  `is_delivery` int(11) NOT NULL DEFAULT 0,
+  `deliveryPartner` varchar(120) NOT NULL DEFAULT '',
+  `sales_source` int(11) DEFAULT NULL,
+  `HIID` int(11) DEFAULT NULL,
+  PRIMARY KEY (`IHID`),
+  KEY `fk_InvoiceHeader_shop1` (`shop_SHID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `invoicedetails` (
+  `IDID` int(11) NOT NULL AUTO_INCREMENT,
+  `Item_Name` text NOT NULL,
+  `SellQty` decimal(12,3) DEFAULT NULL,
+  `UnitPrice` decimal(12,2) DEFAULT NULL,
+  `SellAmount` decimal(12,2) DEFAULT NULL,
+  `PercentDiscount` decimal(12,2) DEFAULT NULL,
+  `DirectDiscount` decimal(12,2) DEFAULT NULL,
+  `SellDiscount` decimal(12,2) DEFAULT NULL,
+  `disc_type` int(11) DEFAULT 0,
+  `ItemType` int(11) NOT NULL DEFAULT 1,
+  `SoldAmount` decimal(12,2) DEFAULT NULL,
+  `WarrantyStart` date DEFAULT NULL,
+  `WarrantyEnd` date DEFAULT NULL,
+  `ReferenceNo` varchar(45) DEFAULT NULL,
+  `InvoiceHeader_IHID` int(11) NOT NULL,
+  `products_PDID` int(11) NOT NULL,
+  `item_des` varchar(250) NOT NULL DEFAULT '',
+  `batch_no` varchar(12) DEFAULT NULL,
+  `Inventory_INID` int(11) NOT NULL DEFAULT 0,
+  `shop_id` int(11) NOT NULL,
+  PRIMARY KEY (`IDID`),
+  KEY `fk_InvoiceDetails_InvoiceHeader1_idx` (`InvoiceHeader_IHID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `inventory_consumption` (
+  `ICID` int(11) NOT NULL DEFAULT 0,
+  `invoice_headerID` int(11) NOT NULL,
+  `status` int(11) NOT NULL DEFAULT 1,
+  `inventory_INID` int(11) NOT NULL,
+  `price` float(10,2) NOT NULL,
+  `sold_price` float(10,2) NOT NULL,
+  `batch No` int(11) NOT NULL,
+  `product_PDID` int(11) NOT NULL,
+  `created_date` datetime NOT NULL DEFAULT current_timestamp(),
+  `quantity` float(10,2) NOT NULL,
+  `shop_SHID` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

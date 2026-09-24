@@ -36,6 +36,7 @@ require_once __DIR__ . '/../db/unit_barcodes_migration.php';
 require_once __DIR__ . '/../db/warehouse_fulfilment_migration.php';
 require_once __DIR__ . '/../Includes/scan_upload.php';
 require_once __DIR__ . '/../Includes/customer_orders.php';
+require_once __DIR__ . '/../Includes/warehouse_fulfilment.php';
 require_once __DIR__ . '/../Includes/csrf.php';
 require_once __DIR__ . '/../Includes/shop_session.php';
 require_once __DIR__ . '/DatabaseTestCase.php';
