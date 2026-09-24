@@ -165,6 +165,48 @@ class WarehouseOrder extends Dbh
         return $row;
     }//supplier product
 
+    //The warehouse's own copy of a product this shop sells, for a cart line the cashier ticked
+    //"deliver from warehouse". It is the match a transfer makes when it creates the shop's copy
+    //(Transfer::getDestinationProductID: barcode, name and type), run backwards, so the two can
+    //never disagree about which product is which.
+    //
+    //Read only on purpose. A product the warehouse has never held is not invented here - it
+    //could not be picked, scanned or dispatched, so the till refuses the tick instead.
+    public function supplierCopyOf($shop_id, $product_id)
+    {
+        $supplier = $this->supplierShop($shop_id);
+        if($supplier === null)
+        {
+            return null;
+        }
+
+        //the line must be this shop's own stock item before it can be handed to the warehouse
+        $stmt = $this->connect()->prepare("SELECT Barcode, ItemName FROM products
+            WHERE PDID = ? AND shop_SHID = ? AND ProductStat = 1 AND ItemType = 'P';");
+        $stmt->execute([(int)$product_id, (int)$shop_id]);
+        $mine = $stmt->fetch(PDO::FETCH_ASSOC);
+        if($mine === false)
+        {
+            return null;
+        }
+
+        $stmt = $this->connect()->prepare("SELECT p.*, COALESCE(SUM(i.CurrentQty), 0) AS Available
+            FROM products p LEFT JOIN inventory i ON i.products_PDID = p.PDID AND i.shop_SHID = p.shop_SHID
+            WHERE p.shop_SHID = ? AND p.ProductStat = 1 AND p.ItemType = 'P'
+              AND p.Barcode <=> ? AND p.ItemName <=> ?
+            GROUP BY p.PDID ORDER BY p.PDID LIMIT 1;");
+        $stmt->execute([(int)$supplier['SHID'], $mine['Barcode'], $mine['ItemName']]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if($row === false)
+        {
+            return null;
+        }
+        $row['SupplierShopID'] = (int)$supplier['SHID'];
+        $row['SupplierName'] = $supplier['ShopName'];
+        $row['from_warehouse'] = 1;
+        return $row;
+    }//supplier copy of
+
     //The shop's own copy of a warehouse product, created when it has none. The invoice line has
     //to point at a product of the shop that billed it, and a transfer would create exactly this
     //copy later - so the same helper makes it, and the two can never disagree.

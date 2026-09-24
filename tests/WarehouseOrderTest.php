@@ -444,6 +444,44 @@ final class WarehouseOrderTest extends DatabaseTestCase
         $this->assertSame([$this->bedThere], array_map('intval', array_column($found, 'PDID')));
     }//found by barcode
 
+    // ---- ticking "deliver from warehouse" on the shop's own line ------------------------------
+
+    public function test_the_warehouse_copy_of_a_shop_product_is_found()
+    {
+        $match = $this->orders->supplierCopyOf($this->shop, $this->bedHere);
+
+        $this->assertSame($this->bedThere, (int) $match['PDID']);
+        $this->assertSame($this->warehouse, (int) $match['SupplierShopID']);
+        $this->assertSame('Warehouse', $match['SupplierName']);
+    }//the warehouse's copy is found
+
+    public function test_a_product_the_warehouse_never_had_has_no_copy()
+    {
+        //the shop made this one up itself, so nobody can send it
+        $this->assertNull($this->orders->supplierCopyOf($this->shop, $this->sheetHere));
+    }//no copy, no order
+
+    public function test_a_withdrawn_warehouse_copy_cannot_be_ordered()
+    {
+        $this->pdo->prepare('UPDATE products SET ProductStat = 0 WHERE PDID = ?')->execute([$this->bedThere]);
+
+        $this->assertNull($this->orders->supplierCopyOf($this->shop, $this->bedHere));
+    }//withdrawn upstream
+
+    public function test_a_service_of_the_shop_cannot_be_sent_from_the_warehouse()
+    {
+        $service = $this->createProduct($this->shop, 'SRV00009', 'Fitting', ['ItemType' => 'S']);
+        $this->createProduct($this->warehouse, 'SRV00009', 'Fitting', ['ItemType' => 'S']);
+
+        $this->assertNull($this->orders->supplierCopyOf($this->shop, $service));
+    }//a service is not dispatched
+
+    public function test_only_this_shops_own_line_can_be_turned_over_to_the_warehouse()
+    {
+        //the warehouse's own product is not something this shop is billing, so it is refused
+        $this->assertNull($this->orders->supplierCopyOf($this->shop, $this->bedThere));
+    }//somebody else's product
+
     public function test_billing_a_warehouse_item_gives_the_shop_its_own_copy()
     {
         $fresh = $this->createProduct($this->warehouse, 'NEW00001', 'Divan Base');
