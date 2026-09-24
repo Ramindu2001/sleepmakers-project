@@ -325,3 +325,25 @@ CREATE TABLE `inventory_consumption` (
   `quantity` float(10,2) NOT NULL,
   `shop_SHID` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Categories and subcategories: a product copied into another shop needs the receiving
+-- shop's own names (Model/transfer_class.php getDestinationSubcategoryID).
+CREATE TABLE `categories` (
+  `CTID` int(11) NOT NULL AUTO_INCREMENT,
+  `CategoryNo` varchar(12) DEFAULT NULL,
+  `CategoryName` varchar(60) DEFAULT NULL,
+  `CategoryCode` varchar(12) DEFAULT NULL,
+  `shop_SHID` int(11) NOT NULL,
+  PRIMARY KEY (`CTID`),
+  KEY `fk_categories_shop1_idx` (`shop_SHID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `subcategories` (
+  `SCID` int(11) NOT NULL AUTO_INCREMENT,
+  `SubCatNo` varchar(12) DEFAULT NULL,
+  `SubCatName` varchar(60) DEFAULT NULL,
+  `SubCatCode` varchar(12) DEFAULT NULL,
+  `categories_CTID` int(11) NOT NULL,
+  PRIMARY KEY (`SCID`),
+  KEY `fk_Subcategories_categories1_idx` (`categories_CTID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

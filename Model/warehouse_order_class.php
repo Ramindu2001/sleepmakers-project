@@ -28,6 +28,7 @@ class WarehouseOrder extends Dbh
     const DELIVER_PICKUP = 2;
 
     const FEATURE_NAME = 'Customer Orders';
+    const CUSTOM_ITEM_NAME = 'Custom-made item';
     const VIEW = ['is_view', 'is_create', 'is_edit', 'is_verify'];
     const CHANGE = ['is_create', 'is_edit'];
     const PROCESS = ['is_verify'];
@@ -66,6 +67,127 @@ class WarehouseOrder extends Dbh
         $feature = $this->featureId();
         return $feature > 0 && $this->access->hasFeatureRight($user_id, $shop_id, $feature, $rights);
     }//can
+
+    // ---- what POS needs to offer a warehouse item ---------------------------------------------
+
+    //The shop that fills this shop's orders: another active shop of the same company. With more
+    //than one, the one holding stock wins, so a two-shop company needs no setting at all.
+    public function supplierShop($shop_id)
+    {
+        $stmt = $this->connect()->prepare("SELECT s.SHID, s.ShopName, COALESCE(SUM(i.CurrentQty), 0) AS Stock
+            FROM shop s INNER JOIN shop me ON me.Company_CMID = s.Company_CMID
+            LEFT JOIN inventory i ON i.shop_SHID = s.SHID
+            WHERE me.SHID = ? AND s.SHID <> me.SHID AND s.ShopStat = 1
+            GROUP BY s.SHID ORDER BY Stock DESC, s.SHID ASC LIMIT 1;");
+        $stmt->execute([(int)$shop_id]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row === false ? null : $row;
+    }//supplier shop
+
+    //What POS offers when the shop's own search comes up empty. An item with no stock is still
+    //offered: the warehouse makes it and the customer waits, which is the whole point of the
+    //order. Service items and withdrawn products never appear.
+    public function searchSupplier($shop_id, $term, $limit = 20)
+    {
+        $supplier = $this->supplierShop($shop_id);
+        $term = trim((string)$term);
+        if($supplier === null || $term === '')
+        {
+            return [];
+        }
+
+        $limit = max(1, min(100, (int)$limit));
+        $stmt = $this->connect()->prepare("SELECT p.PDID, p.Barcode, p.ItemName, p.ProdSellPrice, p.SellingUnit,
+            COALESCE(SUM(i.CurrentQty), 0) AS Available
+            FROM products p LEFT JOIN inventory i ON i.products_PDID = p.PDID AND i.shop_SHID = p.shop_SHID
+            WHERE p.shop_SHID = ? AND p.ProductStat = 1 AND p.ItemType = 'P'
+              AND (p.ItemName LIKE ? OR p.Barcode LIKE ?)
+            GROUP BY p.PDID ORDER BY p.ItemName LIMIT " . $limit . ";");
+        $stmt->execute([(int)$supplier['SHID'], '%' . $term . '%', $term . '%']);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach($rows as &$row)
+        {
+            $row['SupplierShopID'] = (int)$supplier['SHID'];
+            $row['SupplierName'] = $supplier['ShopName'];
+            $row['from_warehouse'] = 1;
+        }
+        unset($row);
+        return $rows;
+    }//search supplier
+
+    //One warehouse product by its exact barcode, for the POS scanner.
+    public function supplierBarcode($shop_id, $barcode)
+    {
+        $supplier = $this->supplierShop($shop_id);
+        $barcode = trim((string)$barcode);
+        if($supplier === null || $barcode === '')
+        {
+            return null;
+        }
+        $stmt = $this->connect()->prepare("SELECT p.PDID, p.Barcode, p.ItemName, p.ProdSellPrice, p.SellingUnit,
+            COALESCE(SUM(i.CurrentQty), 0) AS Available
+            FROM products p LEFT JOIN inventory i ON i.products_PDID = p.PDID AND i.shop_SHID = p.shop_SHID
+            WHERE p.shop_SHID = ? AND p.ProductStat = 1 AND p.ItemType = 'P' AND UPPER(TRIM(p.Barcode)) = ?
+            GROUP BY p.PDID ORDER BY p.PDID LIMIT 1;");
+        $stmt->execute([(int)$supplier['SHID'], strtoupper($barcode)]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if($row === false)
+        {
+            return null;
+        }
+        $row['SupplierShopID'] = (int)$supplier['SHID'];
+        $row['SupplierName'] = $supplier['ShopName'];
+        $row['from_warehouse'] = 1;
+        return $row;
+    }//supplier barcode
+
+    //The shop's own copy of a warehouse product, created when it has none. The invoice line has
+    //to point at a product of the shop that billed it, and a transfer would create exactly this
+    //copy later - so the same helper makes it, and the two can never disagree.
+    public function shopCopyOf($supplier_product_id, $shop_id, $user_id)
+    {
+        return (int)(new Transfer())->getDestinationProductID((int)$supplier_product_id, (int)$shop_id, (int)$user_id);
+    }//shop copy of
+
+    //Custom-made items are billed against one service product per shop. A service item skips
+    //stock in POS already, so no new billing path is invented; what the customer actually
+    //ordered is the typed name on the invoice line and the specs on the order line.
+    public function customItemProduct($shop_id, $user_id)
+    {
+        $stmt = $this->connect()->prepare("SELECT PDID FROM products
+            WHERE shop_SHID = ? AND ItemName = ? AND ItemType = 'S' ORDER BY PDID LIMIT 1;");
+        $stmt->execute([(int)$shop_id, self::CUSTOM_ITEM_NAME]);
+        $found = $stmt->fetchColumn();
+        if($found !== false)
+        {
+            return (int)$found;
+        }
+
+        $today = date('Y-m-d');
+        $this->connect()->prepare("INSERT INTO products (ProductNo, Barcode, ItemName, ProdDescription, SecondName,
+            ProdPurchasePrice, ProdSellPrice, CartonQty, ProductStat, AddedDate, UpdatedDate, ItemType, user_USID,
+            UpdateUserID, Subcategories_SCID, shop_SHID, PurchaseUnit, UnitConversion, SellingUnit,
+            prodDiscount, prodFlatDiscount, is_fixedPrice)
+            VALUES ('', NULL, ?, ?, '', 0, 0, 1, 1, ?, ?, 'S', ?, ?, ?, ?, 1, 1, 1, 0, 0, 0);")
+            ->execute([self::CUSTOM_ITEM_NAME, 'Made to order for one customer', $today, $today,
+                (int)$user_id, (int)$user_id, $this->anySubcategory($shop_id), (int)$shop_id]);
+        $id = (int)$this->connect()->lastInsertId();
+
+        $this->connect()->prepare("UPDATE products SET ProductNo = ? WHERE PDID = ?;")
+            ->execute([(new Common())->createCount('PD', $id), $id]);
+        return $id;
+    }//custom item product
+
+    //any subcategory of this shop, so the service product sits somewhere sensible
+    private function anySubcategory($shop_id)
+    {
+        $stmt = $this->connect()->prepare("SELECT sc.SCID FROM subcategories sc
+            INNER JOIN categories c ON c.CTID = sc.categories_CTID
+            WHERE c.shop_SHID = ? ORDER BY sc.SCID LIMIT 1;");
+        $stmt->execute([(int)$shop_id]);
+        $found = $stmt->fetchColumn();
+        return $found === false ? 0 : (int)$found;
+    }//any subcategory
 
     // ---- creating ---------------------------------------------------------------------------
 

@@ -374,6 +374,95 @@ final class WarehouseOrderTest extends DatabaseTestCase
         }
     }//no right, no action
 
+    // ---- what POS needs to offer a warehouse item ---------------------------------------------
+
+    public function test_the_shop_finds_the_warehouse_bed_it_does_not_stock()
+    {
+        $found = $this->orders->searchSupplier($this->shop, 'Cooler');
+
+        $this->assertSame([$this->bedThere], array_map('intval', array_column($found, 'PDID')));
+        $this->assertSame(5.0, (float) $found[0]['Available']);
+    }//the shop finds the warehouse bed
+
+    public function test_a_warehouse_item_with_no_stock_is_still_offered()
+    {
+        $this->pdo->prepare('UPDATE inventory SET CurrentQty = 0 WHERE products_PDID = ?')->execute([$this->bedThere]);
+
+        $found = $this->orders->searchSupplier($this->shop, 'Cooler');
+
+        //it can still be ordered - the warehouse makes it, the customer waits
+        $this->assertCount(1, $found);
+        $this->assertSame(0.0, (float) $found[0]['Available']);
+    }//no stock is still offered
+
+    public function test_an_inactive_or_service_warehouse_item_is_never_offered()
+    {
+        $this->createProduct($this->warehouse, 'SRV00001', 'Cooler service', ['ItemType' => 'S']);
+        $this->createProduct($this->warehouse, 'OLD00001', 'Cooler Bed old', ['ProductStat' => 0]);
+
+        $names = array_column($this->orders->searchSupplier($this->shop, 'Cooler'), 'ItemName');
+
+        $this->assertSame(['Cooler Bed'], $names);
+    }//inactive and service items are not offered
+
+    public function test_a_warehouse_item_can_be_found_by_its_barcode()
+    {
+        $found = $this->orders->searchSupplier($this->shop, 'COO00001');
+
+        $this->assertSame([$this->bedThere], array_map('intval', array_column($found, 'PDID')));
+    }//found by barcode
+
+    public function test_billing_a_warehouse_item_gives_the_shop_its_own_copy()
+    {
+        $fresh = $this->createProduct($this->warehouse, 'NEW00001', 'Divan Base');
+
+        $copy = $this->orders->shopCopyOf($fresh, $this->shop, $this->cashier);
+
+        $stmt = $this->pdo->prepare('SELECT shop_SHID, Barcode FROM products WHERE PDID = ?');
+        $stmt->execute([$copy]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $this->assertNotSame($fresh, $copy);
+        $this->assertSame([$this->shop, 'NEW00001'], [(int) $row['shop_SHID'], $row['Barcode']]);
+    }//the shop gets its own copy
+
+    public function test_the_copy_is_made_once_however_often_it_is_billed()
+    {
+        $fresh = $this->createProduct($this->warehouse, 'NEW00002', 'Divan Base 2');
+
+        $first = $this->orders->shopCopyOf($fresh, $this->shop, $this->cashier);
+        $second = $this->orders->shopCopyOf($fresh, $this->shop, $this->cashier);
+
+        $this->assertSame($first, $second);
+    }//the copy is made once
+
+    public function test_custom_items_all_bill_against_one_service_product()
+    {
+        $first = $this->orders->customItemProduct($this->shop, $this->cashier);
+        $second = $this->orders->customItemProduct($this->shop, $this->cashier);
+
+        $stmt = $this->pdo->prepare('SELECT ItemType, ItemName, shop_SHID FROM products WHERE PDID = ?');
+        $stmt->execute([$first]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $this->assertSame($first, $second);
+        $this->assertSame(['S', 'Custom-made item', $this->shop],
+            [$row['ItemType'], $row['ItemName'], (int) $row['shop_SHID']]);
+    }//one service product for custom items
+
+    public function test_the_shop_knows_which_shop_supplies_it()
+    {
+        $supplier = $this->orders->supplierShop($this->shop);
+
+        $this->assertSame($this->warehouse, (int) $supplier['SHID']);
+    }//knows its supplier
+
+    public function test_a_shop_on_its_own_has_no_supplier_and_finds_nothing()
+    {
+        $lonely = $this->createShop($this->createCompany(), ['ShopName' => 'Only shop']);
+
+        $this->assertNull($this->orders->supplierShop($lonely));
+        $this->assertSame([], $this->orders->searchSupplier($lonely, 'Cooler'));
+    }//a shop on its own
+
     //an order with two things for the warehouse and nothing given
     private function twoWarehouseLines()
     {
