@@ -602,6 +602,28 @@ class WarehouseOrder extends Dbh
         return $status;
     }//refresh status
 
+    //What OrderDispatch needs from here, so the rules live in one place and a dispatch cannot
+    //quietly invent its own idea of who may do what.
+    public function lockOrder($id, $shop_id)
+    {
+        return $this->lock($id, $shop_id);
+    }//lock order
+
+    public function requireIncoming(array $order, $shop_id)
+    {
+        $this->requireSide($order, $shop_id, 'incoming');
+    }//require incoming
+
+    public function requireProcessRight($user_id, $shop_id)
+    {
+        $this->requireRight($user_id, $shop_id, self::PROCESS, 'prepare customer orders');
+    }//require process right
+
+    public function requireStillOpen(array $order)
+    {
+        $this->requireOpen($order);
+    }//require still open
+
     //a line of this order, or 404
     protected function lineOf($order_id, $line_id)
     {
