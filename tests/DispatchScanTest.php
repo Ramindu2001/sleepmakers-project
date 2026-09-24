@@ -197,4 +197,164 @@ final class DispatchScanTest extends DatabaseTestCase
 
         $this->assertSame('DS_000002', $second['dispatch_no']);
     }//a cancelled dispatch frees the order
+
+    // ---- scanning ---------------------------------------------------------------------------------
+
+    private function scan()
+    {
+        if ($this->scan === null) {
+            $this->scan = new DispatchScan();
+        }
+        return $this->scan;
+    }//scan
+
+    public function test_scanning_the_bed_counts_one_against_its_line()
+    {
+        $dispatch = $this->openDispatch();
+
+        $preview = $this->scan()->preview($dispatch, $this->warehouse, $this->picker, 'COO00001');
+
+        $this->assertSame([1, 'ok'], [$preview['lines'][0]['qty'], $preview['lines'][0]['status']]);
+        $this->assertTrue($preview['can_apply']);
+    }//scanning the bed
+
+    public function test_the_scan_screen_says_what_is_still_needed()
+    {
+        $dispatch = $this->openDispatch(2);
+
+        $preview = $this->scan()->preview($dispatch, $this->warehouse, $this->picker, 'COO00001');
+
+        $this->assertSame([2, 0, 2], [$preview['needed'][0]['needed'], $preview['needed'][0]['scanned'],
+            $preview['needed'][0]['outstanding']]);
+    }//what is still needed
+
+    public function test_applying_records_what_was_scanned()
+    {
+        $dispatch = $this->openDispatch(2);
+
+        $this->scan()->apply($dispatch, $this->warehouse, $this->picker, "COO00001\nCOO00001", []);
+
+        $stmt = $this->pdo->prepare('SELECT SUM(Qty) FROM orderdispatchlines WHERE orderdispatches_DSID = ?');
+        $stmt->execute([$dispatch]);
+        $this->assertSame(2.0, (float) $stmt->fetchColumn());
+    }//applying records the scans
+
+    public function test_a_unit_sticker_is_recorded_against_the_customer()
+    {
+        $dispatch = $this->openDispatch();
+        $code = $this->printUnit();
+
+        $this->scan()->apply($dispatch, $this->warehouse, $this->picker, $code, []);
+
+        $stmt = $this->pdo->prepare('SELECT UnitBarcode, productunits_PUID FROM orderdispatchlines WHERE orderdispatches_DSID = ?');
+        $stmt->execute([$dispatch]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $this->assertSame($code, $row['UnitBarcode']);
+        $this->assertNotNull($row['productunits_PUID']);
+    }//a sticker is recorded
+
+    public function test_a_code_we_do_not_know_is_refused()
+    {
+        $preview = $this->scan()->preview($this->openDispatch(), $this->warehouse, $this->picker, 'NOT-A-CODE');
+
+        $this->assertSame('error', $preview['lines'][0]['status']);
+        $this->assertStringContainsString('Not a product we know', $preview['lines'][0]['message']);
+        $this->assertFalse($preview['can_apply']);
+    }//an unknown code
+
+    public function test_a_product_that_is_not_on_this_order_is_refused()
+    {
+        $this->createProduct($this->warehouse, 'PIL00001', 'Pillow');
+        $preview = $this->scan()->preview($this->openDispatch(), $this->warehouse, $this->picker, 'PIL00001');
+
+        $this->assertStringContainsString('Not on this order', $preview['lines'][0]['message']);
+    }//not on this order
+
+    public function test_an_item_already_given_at_the_shop_is_refused_by_name()
+    {
+        $this->createProduct($this->warehouse, 'LIN00001', 'Bedsheet');
+        $preview = $this->scan()->preview($this->openDispatch(), $this->warehouse, $this->picker, 'LIN00001');
+
+        $this->assertStringContainsString('Given at the shop', $preview['lines'][0]['message']);
+    }//given at the shop
+
+    public function test_the_same_sticker_twice_counts_once()
+    {
+        $dispatch = $this->openDispatch();
+        $code = $this->printUnit();
+
+        $preview = $this->scan()->preview($dispatch, $this->warehouse, $this->picker, $code . "\n" . $code);
+
+        $this->assertSame(1, $preview['lines'][0]['apply_qty']);
+        $this->assertStringContainsString('scanned twice', $preview['lines'][0]['message']);
+        $this->assertTrue($preview['can_apply']);
+    }//the same sticker twice
+
+    public function test_more_than_the_line_needs_is_refused()
+    {
+        $dispatch = $this->openDispatch();
+
+        $preview = $this->scan()->preview($dispatch, $this->warehouse, $this->picker, "COO00001\nCOO00001");
+
+        $this->assertSame('error', $preview['lines'][0]['status']);
+        $this->assertStringContainsString('Only 1 more needed', $preview['lines'][0]['message']);
+    }//over-scanning
+
+    public function test_what_is_already_in_the_dispatch_counts_towards_the_total()
+    {
+        $dispatch = $this->openDispatch(2);
+        $this->scan()->apply($dispatch, $this->warehouse, $this->picker, 'COO00001', []);
+
+        $ok = $this->scan()->preview($dispatch, $this->warehouse, $this->picker, 'COO00001');
+        $tooMany = $this->scan()->preview($dispatch, $this->warehouse, $this->picker, "COO00001\nCOO00001");
+
+        $this->assertTrue($ok['can_apply']);
+        $this->assertSame('error', $tooMany['lines'][0]['status']);
+    }//earlier scans count
+
+    public function test_a_voided_sticker_is_refused()
+    {
+        $dispatch = $this->openDispatch();
+        $code = $this->printUnit();
+        $this->pdo->prepare('UPDATE productunits SET UnitStat = ? WHERE UnitBarcode = ?')
+            ->execute([ProductUnits::VOIDED, $code]);
+
+        $preview = $this->scan()->preview($dispatch, $this->warehouse, $this->picker, $code);
+
+        $this->assertStringContainsString('Voided sticker', $preview['lines'][0]['message']);
+    }//a voided sticker
+
+    public function test_a_sticker_sitting_in_another_open_dispatch_is_refused()
+    {
+        $code = $this->printUnit();
+        $theirs = $this->openDispatchOnAnotherOrder();
+        $this->scan()->apply($theirs, $this->warehouse, $this->picker, $code, []);
+        $mine = $this->openDispatch();
+
+        $preview = $this->scan()->preview($mine, $this->warehouse, $this->picker, $code);
+
+        $this->assertSame('error', $preview['lines'][0]['status']);
+        $this->assertStringContainsString('Being dispatched on DS_', $preview['lines'][0]['message']);
+    }//a sticker in another open dispatch
+
+    //the sale was returned overnight, so nothing on it should go out
+    public function test_a_dispatch_for_a_cancelled_invoice_is_refused()
+    {
+        $dispatch = $this->openDispatch();
+        $this->pdo->prepare('UPDATE invoiceheader SET InvStat = 0 WHERE IHID = ?')->execute([$this->invoiceId]);
+
+        $this->expectException(ScanRefused::class);
+        $this->scan()->apply($dispatch, $this->warehouse, $this->picker, 'COO00001', []);
+    }//a cancelled invoice
+
+    public function test_someone_without_the_right_cannot_scan()
+    {
+        $dispatch = $this->openDispatch();
+        $bare = $this->createRole('No rights');
+        $outsider = $this->createUser('outsider', 'x', $bare);
+        $this->assign($outsider, $this->warehouse, $bare);
+
+        $this->expectException(ScanRefused::class);
+        $this->scan()->preview($dispatch, $this->warehouse, $outsider, 'COO00001');
+    }//no right, no scanning
 }//DispatchScanTest

@@ -24,6 +24,7 @@ class ProductUnits extends Dbh
     const PRINTED = 1;
     const RECEIVED = 2;
     const VOIDED = 0;
+    const DISPATCHED = 3;   //sent to the customer it was sold to
 
     const MAX_PER_PRINT = 5000;            //one print job; the label page caps what it renders
     const DEFAULTS = [

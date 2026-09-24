@@ -11,3 +11,5 @@ require_once __DIR__ . '/../Model/product_unit_class.php';
 require_once __DIR__ . '/../Model/customer_order_refused_class.php';
 require_once __DIR__ . '/../Model/warehouse_order_class.php';
 require_once __DIR__ . '/../Model/order_dispatch_class.php';
+require_once __DIR__ . '/scan_upload.php';
+require_once __DIR__ . '/../Model/scan_dispatch_class.php';

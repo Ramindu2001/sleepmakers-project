@@ -6,6 +6,7 @@
 include "../Includes/includes.php";
 require_once "../Includes/csrf.php";
 require_once "../Includes/scan_upload.php";
+require_once "../Includes/warehouse_fulfilment.php";
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -85,6 +86,12 @@ try
         $model = new TransferScan();
         $check = function() use ($model, $doc_id, $shop_id, $user_id, $raw, $decisions) { return $model->receivePreview($doc_id, $shop_id, $user_id, $raw, $decisions); };
         $apply = function() use ($model, $doc_id, $shop_id, $user_id, $raw, $decisions) { return $model->receiveApply($doc_id, $shop_id, $user_id, $raw, $decisions); };
+    }
+    elseif($context === "dispatch")
+    {
+        $model = new DispatchScan();
+        $check = function() use ($model, $doc_id, $shop_id, $user_id, $raw, $decisions) { return $model->preview($doc_id, $shop_id, $user_id, $raw, $decisions); };
+        $apply = function() use ($model, $doc_id, $shop_id, $user_id, $raw, $decisions) { return $model->apply($doc_id, $shop_id, $user_id, $raw, $decisions); };
     }
     else
     {
