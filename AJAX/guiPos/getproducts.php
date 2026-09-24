@@ -435,6 +435,30 @@ else if(!isset($_GET["product_id"]) && (isset($_GET["subcat"]) || isset($_GET["v
     <?php
 }
 elseif (isset($_GET["product_id"])) {
+    //The cashier ticked "deliver from warehouse" on a line the shop itself sells. The shop keeps
+    //billing its own product; what is needed is the warehouse's copy, so the order line names
+    //something the warehouse can really pick and scan.
+    if(isset($_GET["warehouse_match"]))
+    {
+        $orders = new WarehouseOrder();
+        $match = $orders->supplierCopyOf($shop_id, $_GET["product_id"]);
+        if($match === null)
+        {
+            $supplier = $orders->supplierShop($shop_id);
+            returnError("00006", ($supplier === null ? "No warehouse" : $supplier["ShopName"])
+                . " does not keep this item, so it cannot be delivered from there."
+                . " Use Custom-made item if it has to be made to order.");
+        }
+        echo json_encode([
+            "warehouse_match" => 1,
+            "supplier_product_id" => (int)$match["PDID"],
+            "supplier_shop_id" => (int)$match["SupplierShopID"],
+            "supplier_name" => $match["SupplierName"],
+            "item_name" => $match["ItemName"],
+        ]);
+        exit;
+    }//the warehouse's copy of one of our own products
+
     //A product the warehouse holds, not this shop. It is billed now and delivered later, so it
     //has no stock here and no batch price - the warehouse's own selling price is what the
     //customer pays, and the quantity is not capped by a shelf.

@@ -3,8 +3,9 @@
 //(docs/superpowers/specs/2026-09-24-pos-warehouse-fulfilment-design.md).
 //
 //The cart posts one extra set of fields beside the usual item_id[] arrays:
-//  wh_line[i]              '1' when this line cannot be given from the shop
+//  wh_line[i]              '1' when the warehouse sends this line rather than the shop
 //  wh_custom[i]            '1' when it is a custom-made item nobody stocks
+//  wh_own[i]               '1' when the cashier ticked the shop's own product for delivery
 //  wh_supplier_product[i]  the warehouse's product id (empty for a custom item)
 //  wh_notes[i]             the customer's requirements for that line
 //  wh_supplier_shop, wh_customer_id, wh_cust_name, wh_cust_phone, wh_cust_address,
@@ -38,20 +39,41 @@ function warehouseOrderWanted()
 //(and a custom item's service product), and item_id[] is rewritten to it - the invoice line has
 //to carry a product of the shop that billed it. With $create false nothing is written, so the
 //same data can be checked before the sale commits to anything.
+//
+//A line the cashier ticked on the shop's own product (wh_own) is different: the shop is already
+//billing its own product, so item_id[] stays as it is and only the warehouse's copy is looked
+//up. Throws CustomerOrderRefused when the warehouse keeps no such product.
 function warehouseOrderBuild($shop_id, $user_id, $create)
 {
     $orders = new WarehouseOrder();
     $lines = array();
+    $supplier_shop = isset($_POST['wh_supplier_shop']) ? (int)$_POST['wh_supplier_shop'] : 0;
     $count = count($_POST['item_id']);
     for($i = 0; $i < $count; $i++)
     {
         $warehouse = !empty($_POST['wh_line'][$i]);
         $custom = !empty($_POST['wh_custom'][$i]);
+        $own = $warehouse && !$custom && !empty($_POST['wh_own'][$i]);
         $supplier_product = ($warehouse && !$custom && !empty($_POST['wh_supplier_product'][$i]))
             ? (int)$_POST['wh_supplier_product'][$i] : null;
         $product_id = (int)$_POST['item_id'][$i];
+        $description = isset($_POST['Item_name'][$i]) ? trim((string)$_POST['Item_name'][$i]) : '';
 
-        if($warehouse && $create)
+        if($own)
+        {
+            //Never trust the posted warehouse product for a line the shop bills itself: a cart
+            //that said "pillow" but named a bed would have the warehouse send the bed. Resolve
+            //it here instead, from the product actually being billed.
+            $match = $orders->supplierCopyOf($shop_id, $product_id);
+            if($match === null)
+            {
+                throw new CustomerOrderRefused(422, ($description === '' ? 'That item' : $description)
+                    . ' cannot be delivered from the warehouse: it does not keep that item.');
+            }
+            $supplier_product = (int)$match['PDID'];
+            $supplier_shop = $supplier_shop > 0 ? $supplier_shop : (int)$match['SupplierShopID'];
+        }//the shop's own line, handed to the warehouse
+        elseif($warehouse && $create)
         {
             $product_id = $custom
                 ? $orders->customItemProduct($shop_id, $user_id)
@@ -62,9 +84,9 @@ function warehouseOrderBuild($shop_id, $user_id, $create)
         $lines[] = array(
             'source' => $warehouse ? 'WAREHOUSE' : 'GIVEN',
             //a custom item has no product of its own: it is described in words
-            'product_id' => ($warehouse && $custom) ? null : ($create || !$warehouse ? $product_id : null),
+            'product_id' => ($warehouse && $custom) ? null : ($create || !$warehouse || $own ? $product_id : null),
             'supplier_product_id' => $supplier_product,
-            'description' => isset($_POST['Item_name'][$i]) ? $_POST['Item_name'][$i] : '',
+            'description' => $description,
             'qty' => isset($_POST['qty'][$i]) ? $_POST['qty'][$i] : 0,
             'notes' => isset($_POST['wh_notes'][$i]) ? $_POST['wh_notes'][$i] : '',
             'unit_price' => isset($_POST['rate'][$i]) ? $_POST['rate'][$i] : 0,
@@ -76,7 +98,7 @@ function warehouseOrderBuild($shop_id, $user_id, $create)
 
     return array(
         'invoice_id' => null,
-        'supplier_shop_id' => isset($_POST['wh_supplier_shop']) ? (int)$_POST['wh_supplier_shop'] : 0,
+        'supplier_shop_id' => $supplier_shop,
         'customer_id' => isset($_POST['wh_customer_id']) ? $_POST['wh_customer_id'] : null,
         'cust_name' => isset($_POST['wh_cust_name']) ? $_POST['wh_cust_name'] : '',
         'cust_phone' => isset($_POST['wh_cust_phone']) ? $_POST['wh_cust_phone'] : '',
@@ -132,7 +154,17 @@ function warehouseOrderPlace($shop_id, $user_id, $invoice_id, array &$alert)
 
 //The shop's own copies have to exist before the invoice lines are written, so this runs inside
 //the checkout just before the invoice header, rewriting item_id[] for the warehouse lines.
+//Returns '' when all is well, or the message to show the cashier - a sale that gets a message
+//here must not go on, because the warehouse could not be told to send the goods.
 function warehouseOrderPrepareCart($shop_id, $user_id)
 {
-    warehouseOrderBuild($shop_id, $user_id, true);
+    try
+    {
+        warehouseOrderBuild($shop_id, $user_id, true);
+        return '';
+    }
+    catch(CustomerOrderRefused $e)
+    {
+        return $e->getMessage();
+    }
 }//warehouse order prepare cart

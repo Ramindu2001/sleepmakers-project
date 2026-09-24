@@ -249,7 +249,15 @@ if(isset($_GET["cash"]) || isset($_POST["cash"]))
             //lines are written: an invoice line belongs to the shop that raised it
             if(warehouseOrderWanted())
             {
-                warehouseOrderPrepareCart($shop_id, $user_USID);
+                $whProblem = warehouseOrderPrepareCart($shop_id, $user_USID);
+                if($whProblem !== "")
+                {
+                    //nothing is written yet, so the sale simply stops here
+                    $alert["Error"][] = $whProblem;
+                    header('Content-Type: application/json');
+                    echo json_encode($alert);
+                    exit;
+                }
             }
             $guiObj->update_docno(shop_id: $shop_id,org_no:$newws_no );
             $HIID=0;
@@ -981,7 +989,15 @@ if(isset($_GET["btn_submit_invoice"]) || isset($_GET["btn_submit"]))
             //lines are written: an invoice line belongs to the shop that raised it
             if(warehouseOrderWanted())
             {
-                warehouseOrderPrepareCart($shop_id, $user_USID);
+                $whProblem = warehouseOrderPrepareCart($shop_id, $user_USID);
+                if($whProblem !== "")
+                {
+                    //nothing is written yet, so the sale simply stops here
+                    $alert["Error"][] = $whProblem;
+                    header('Content-Type: application/json');
+                    echo json_encode($alert);
+                    exit;
+                }
             }
             $guiObj->update_docno(shop_id: $shop_id,org_no:$newws_no );
             $HIID=0;
