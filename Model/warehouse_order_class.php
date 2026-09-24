@@ -252,6 +252,247 @@ class WarehouseOrder extends Dbh
         return $row;
     }//supplier shop row
 
+    // ---- the warehouse works the order --------------------------------------------------------
+
+    //the warehouse has picked the order up off the queue
+    public function startPreparing($id, $shop_id, $user_id)
+    {
+        return $this->transaction(function() use ($id, $shop_id, $user_id) {
+            $order = $this->lock($id, $shop_id);
+            $this->requireSide($order, $shop_id, 'incoming');
+            $this->requireRight($user_id, $shop_id, self::PROCESS, 'prepare customer orders');
+            $this->requireOpen($order);
+
+            $this->connect()->prepare("UPDATE customerorders SET DecidedBy = ?, DecidedAt = ? WHERE COID = ?;")
+                ->execute([(int)$user_id, date('Y-m-d H:i:s'), (int)$id]);
+            $this->refreshStatus($id);
+
+            return ['message' => 'Order ' . $order['OrderNo'] . ' is being prepared.'];
+        });
+    }//start preparing
+
+    //one line is picked and packed, or all of them ($line_id null)
+    public function markReady($id, $shop_id, $user_id, $line_id = null)
+    {
+        return $this->transaction(function() use ($id, $shop_id, $user_id, $line_id) {
+            $order = $this->lock($id, $shop_id);
+            $this->requireSide($order, $shop_id, 'incoming');
+            $this->requireRight($user_id, $shop_id, self::PROCESS, 'prepare customer orders');
+            $this->requireOpen($order);
+
+            $ready = 0;
+            foreach($this->linesOf($id) as $line)
+            {
+                if($line_id !== null && (int)$line['COLID'] !== (int)$line_id)
+                {
+                    continue;
+                }//one line only
+                if($line_id !== null)
+                {
+                    $this->requirePickable($line);
+                }//say why this one cannot be readied
+                elseif(!$this->isPickable($line))
+                {
+                    continue;
+                }//mark all: quietly skip what is not pickable
+
+                $this->connect()->prepare("UPDATE customerorderlines SET LineStat = ? WHERE COLID = ?;")
+                    ->execute([self::LINE_READY, (int)$line['COLID']]);
+                $ready++;
+            }//each line
+
+            if($line_id !== null && $ready === 0)
+            {
+                throw new CustomerOrderRefused(404, 'That item is not on this order.');
+            }
+            if($ready === 0)
+            {
+                throw new CustomerOrderRefused(409, 'There is nothing left to prepare on this order.');
+            }
+            $this->refreshStatus($id);
+
+            return ['message' => $ready . ' item(s) ready to go.'];
+        });
+    }//mark ready
+
+    //the warehouse cannot fill this line at all; the shop refunds it through Sales Return
+    public function cannotSupply($id, $shop_id, $user_id, $line_id, $reason)
+    {
+        return $this->transaction(function() use ($id, $shop_id, $user_id, $line_id, $reason) {
+            $order = $this->lock($id, $shop_id);
+            $this->requireSide($order, $shop_id, 'incoming');
+            $this->requireRight($user_id, $shop_id, self::CHANGE, 'change customer orders');
+            $this->requireOpen($order);
+
+            $reason = trim((string)$reason);
+            if($reason === '')
+            {
+                throw new CustomerOrderRefused(422, 'Say why this item cannot be supplied.');
+            }
+            $line = $this->lineOf($id, $line_id);
+            $this->requirePickable($line);
+
+            $this->connect()->prepare("UPDATE customerorderlines SET LineStat = ?, CancelReason = ? WHERE COLID = ?;")
+                ->execute([self::LINE_CANCELLED, mb_substr($reason, 0, 255), (int)$line['COLID']]);
+            $this->refreshStatus($id);
+
+            return ['message' => $line['Description'] . ' was taken off the order.'];
+        });
+    }//cannot supply
+
+    //the shop calls the whole thing off, while nothing has left the warehouse
+    public function cancel($id, $shop_id, $user_id)
+    {
+        return $this->transaction(function() use ($id, $shop_id, $user_id) {
+            $order = $this->lock($id, $shop_id);
+            $this->requireSide($order, $shop_id, 'ours');
+            $this->requireRight($user_id, $shop_id, self::CHANGE, 'change customer orders');
+            $this->requireOpen($order);
+
+            foreach($this->linesOf($id) as $line)
+            {
+                if((float)$line['DispatchedQty'] > 0)
+                {
+                    throw new CustomerOrderRefused(409, 'Part of this order has already left the warehouse.');
+                }
+            }//nothing may be on its way
+
+            $this->connect()->prepare("UPDATE customerorderlines SET LineStat = ?, CancelReason = ?
+                WHERE customerorders_COID = ? AND LineSource = 'WAREHOUSE' AND LineStat <> ?;")
+                ->execute([self::LINE_CANCELLED, 'The order was cancelled', (int)$id, self::LINE_CANCELLED]);
+            $this->connect()->prepare("UPDATE customerorders SET OrderStat = ?, ClosedBy = ?, ClosedAt = ? WHERE COID = ?;")
+                ->execute([self::CANCELLED, (int)$user_id, date('Y-m-d H:i:s'), (int)$id]);
+
+            return ['message' => 'Order ' . $order['OrderNo'] . ' was cancelled.'];
+        });
+    }//cancel
+
+    //What the order reads as, worked out from its lines - never set by hand, and recomputed by
+    //every action inside that action's own transaction. Public because OrderDispatch calls it
+    //after moving stock.
+    public function refreshStatus($id)
+    {
+        $stmt = $this->connect()->prepare("SELECT OrderStat, ClosedAt, DecidedAt FROM customerorders WHERE COID = ?;");
+        $stmt->execute([(int)$id]);
+        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+        if($order === false)
+        {
+            return null;
+        }
+        if((int)$order['OrderStat'] === self::CANCELLED && $order['ClosedAt'] !== null)
+        {
+            return self::CANCELLED;
+        }//called off by hand: it stays called off
+
+        $open = 0;          //warehouse lines with something still to pick
+        $ready = 0;         //of those, picked and packed
+        $onTheRoad = 0;     //dispatched but not yet delivered
+        $cancelled = 0;
+        $warehouse = 0;
+        $served = 0;        //given over the counter, or delivered
+        foreach($this->linesOf($id) as $line)
+        {
+            if($line['LineSource'] !== 'WAREHOUSE')
+            {
+                $served++;
+                continue;
+            }//given at the shop: the customer already has it
+            $warehouse++;
+            if((int)$line['LineStat'] === self::LINE_CANCELLED)
+            {
+                $cancelled++;
+                continue;
+            }
+            if((float)$line['DeliveredQty'] > 0)
+            {
+                $served++;
+            }
+            if((float)$line['DispatchedQty'] - (float)$line['DeliveredQty'] > 0)
+            {
+                $onTheRoad++;
+            }
+            if((float)$line['Qty'] - (float)$line['DispatchedQty'] > 0)
+            {
+                $open++;
+                if((int)$line['LineStat'] === self::LINE_READY)
+                {
+                    $ready++;
+                }
+            }//still something to pick
+        }//each line
+
+        if($open === 0 && $onTheRoad === 0)
+        {
+            //everything is settled: served the customer, or nothing was ever supplied
+            $status = ($cancelled === $warehouse && $served === 0) ? self::CANCELLED : self::COMPLETED;
+        }
+        elseif($open === 0)
+        {
+            $status = self::DISPATCHED;
+        }
+        elseif($ready === $open)
+        {
+            $status = self::READY;
+        }
+        elseif($ready > 0 || $onTheRoad > 0 || $order['DecidedAt'] !== null)
+        {
+            $status = self::PREPARING;
+        }
+        else
+        {
+            $status = self::PENDING;
+        }
+
+        $this->connect()->prepare("UPDATE customerorders SET OrderStat = ? WHERE COID = ?;")
+            ->execute([$status, (int)$id]);
+        return $status;
+    }//refresh status
+
+    //a line of this order, or 404
+    protected function lineOf($order_id, $line_id)
+    {
+        $stmt = $this->connect()->prepare("SELECT * FROM customerorderlines WHERE COLID = ? AND customerorders_COID = ?;");
+        $stmt->execute([(int)$line_id, (int)$order_id]);
+        $line = $stmt->fetch(PDO::FETCH_ASSOC);
+        if($line === false)
+        {
+            throw new CustomerOrderRefused(404, 'That item is not on this order.');
+        }
+        return $line;
+    }//line of
+
+    //can the warehouse still do something with this line?
+    protected function isPickable(array $line)
+    {
+        return $line['LineSource'] === 'WAREHOUSE'
+            && (int)$line['LineStat'] !== self::LINE_CANCELLED
+            && (float)$line['Qty'] - (float)$line['DispatchedQty'] > 0;
+    }//is pickable
+
+    protected function requirePickable(array $line)
+    {
+        if($line['LineSource'] !== 'WAREHOUSE')
+        {
+            throw new CustomerOrderRefused(409, $line['Description'] . ' was given to the customer at the shop.');
+        }
+        if((int)$line['LineStat'] === self::LINE_CANCELLED)
+        {
+            throw new CustomerOrderRefused(409, $line['Description'] . ' was already taken off this order.');
+        }
+        if((float)$line['Qty'] - (float)$line['DispatchedQty'] <= 0)
+        {
+            throw new CustomerOrderRefused(409, $line['Description'] . ' has already left the warehouse.');
+        }
+    }//require pickable
+
+    protected function requireOpen(array $order)
+    {
+        if(in_array((int)$order['OrderStat'], [self::COMPLETED, self::CANCELLED], true))
+        {
+            throw new CustomerOrderRefused(409, 'This order is already closed.');
+        }
+    }//require open
+
     // ---- reading ----------------------------------------------------------------------------
 
     //the order, its lines, its dispatches and what it is worth, as this shop may see it

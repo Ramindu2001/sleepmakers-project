@@ -242,4 +242,160 @@ final class WarehouseOrderTest extends DatabaseTestCase
 
         $this->assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM customerorders')->fetchColumn());
     }//impossible quantities
+
+    // ---- the warehouse works the order --------------------------------------------------------
+
+    public function test_starting_and_readying_move_the_order_along()
+    {
+        $id = $this->order()['order_id'];
+
+        $this->orders->startPreparing($id, $this->warehouse, $this->picker);
+        $this->assertSame(WarehouseOrder::PREPARING, $this->statusOf($id));
+
+        $this->orders->markReady($id, $this->warehouse, $this->picker);
+        $this->assertSame(WarehouseOrder::READY, $this->statusOf($id));
+    }//starting and readying
+
+    public function test_a_half_ready_order_is_still_preparing()
+    {
+        $id = $this->twoWarehouseLines();
+        $lines = $this->warehouseLines($id);
+
+        $this->orders->markReady($id, $this->warehouse, $this->picker, (int) $lines[0]['COLID']);
+
+        $this->assertSame(WarehouseOrder::PREPARING, $this->statusOf($id));
+    }//a half ready order
+
+    public function test_a_line_the_warehouse_cannot_supply_is_closed_with_its_reason()
+    {
+        $id = $this->order()['order_id'];
+        $line = (int) $this->warehouseLines($id)[0]['COLID'];
+
+        $this->orders->cannotSupply($id, $this->warehouse, $this->picker, $line, 'Discontinued by the mill');
+
+        $view = $this->orders->get($id, $this->warehouse, $this->picker);
+        $this->assertSame(WarehouseOrder::LINE_CANCELLED, (int) $view['lines'][1]['LineStat']);
+        $this->assertSame('Discontinued by the mill', $view['lines'][1]['CancelReason']);
+    }//cannot supply
+
+    //the bedsheet was handed over, so the customer was served even though the bed fell through
+    public function test_an_order_whose_last_warehouse_line_is_cancelled_completes()
+    {
+        $id = $this->order()['order_id'];
+        $line = (int) $this->warehouseLines($id)[0]['COLID'];
+
+        $this->orders->cannotSupply($id, $this->warehouse, $this->picker, $line, 'None left');
+
+        $this->assertSame(WarehouseOrder::COMPLETED, $this->statusOf($id));
+    }//cancelled but something was given
+
+    public function test_an_order_with_nothing_given_and_nothing_supplied_is_cancelled()
+    {
+        $id = $this->order([['source' => 'WAREHOUSE', 'product_id' => $this->bedHere,
+            'supplier_product_id' => $this->bedThere, 'description' => 'Cooler Bed', 'qty' => 1,
+            'notes' => '', 'unit_price' => 800]])['order_id'];
+        $line = (int) $this->warehouseLines($id)[0]['COLID'];
+
+        $this->orders->cannotSupply($id, $this->warehouse, $this->picker, $line, 'None left');
+
+        $this->assertSame(WarehouseOrder::CANCELLED, $this->statusOf($id));
+    }//nothing given, nothing supplied
+
+    public function test_a_reason_is_required_to_refuse_a_line()
+    {
+        $id = $this->order()['order_id'];
+        $line = (int) $this->warehouseLines($id)[0]['COLID'];
+
+        $this->expectException(CustomerOrderRefused::class);
+        $this->orders->cannotSupply($id, $this->warehouse, $this->picker, $line, '   ');
+    }//a reason is required
+
+    public function test_a_given_line_can_never_be_readied_or_refused()
+    {
+        $id = $this->order()['order_id'];
+        $given = (int) $this->orders->get($id, $this->warehouse, $this->picker)['lines'][0]['COLID'];
+
+        try {
+            $this->orders->markReady($id, $this->warehouse, $this->picker, $given);
+            $this->fail('a line given at the shop was readied for picking');
+        } catch (CustomerOrderRefused $e) {
+            $this->assertSame(409, $e->status);
+        }
+
+        $this->expectException(CustomerOrderRefused::class);
+        $this->orders->cannotSupply($id, $this->warehouse, $this->picker, $given, 'No');
+    }//a given line is untouchable
+
+    public function test_a_line_of_another_order_cannot_be_readied()
+    {
+        $mine = $this->order()['order_id'];
+        $theirs = (int) $this->warehouseLines($this->order()['order_id'])[0]['COLID'];
+
+        $this->expectException(CustomerOrderRefused::class);
+        $this->orders->markReady($mine, $this->warehouse, $this->picker, $theirs);
+    }//another order's line
+
+    public function test_the_shop_cannot_prepare_and_the_warehouse_cannot_cancel_the_order()
+    {
+        $id = $this->order()['order_id'];
+
+        try {
+            $this->orders->startPreparing($id, $this->shop, $this->cashier);
+            $this->fail('the shop prepared its own order');
+        } catch (CustomerOrderRefused $e) {
+            $this->assertSame(404, $e->status);
+        }
+
+        $this->expectException(CustomerOrderRefused::class);
+        $this->orders->cancel($id, $this->warehouse, $this->picker);
+    }//each side keeps to its own actions
+
+    public function test_the_shop_can_cancel_an_order_nothing_has_left_on()
+    {
+        $id = $this->order()['order_id'];
+
+        $this->orders->cancel($id, $this->shop, $this->cashier);
+
+        $this->assertSame(WarehouseOrder::CANCELLED, $this->statusOf($id));
+    }//the shop cancels
+
+    public function test_someone_without_the_right_cannot_prepare()
+    {
+        $id = $this->order()['order_id'];
+        $bare = $this->createRole('No rights');
+        $outsider = $this->createUser('outsider', 'x', $bare);
+        $this->assign($outsider, $this->warehouse, $bare);
+
+        try {
+            $this->orders->startPreparing($id, $this->warehouse, $outsider);
+            $this->fail('expected a refusal');
+        } catch (CustomerOrderRefused $e) {
+            $this->assertSame(403, $e->status);
+        }
+    }//no right, no action
+
+    //an order with two things for the warehouse and nothing given
+    private function twoWarehouseLines()
+    {
+        return $this->order([
+            ['source' => 'WAREHOUSE', 'product_id' => $this->bedHere, 'supplier_product_id' => $this->bedThere,
+                'description' => 'Cooler Bed', 'qty' => 1, 'notes' => '', 'unit_price' => 800],
+            ['source' => 'WAREHOUSE', 'product_id' => null, 'supplier_product_id' => null,
+                'description' => 'Headboard', 'qty' => 1, 'notes' => '', 'unit_price' => 45000],
+        ])['order_id'];
+    }//two warehouse lines
+
+    private function warehouseLines($order_id)
+    {
+        return array_values(array_filter($this->orders->linesOf($order_id), function ($line) {
+            return $line['LineSource'] === 'WAREHOUSE';
+        }));
+    }//warehouse lines
+
+    private function statusOf($id)
+    {
+        $stmt = $this->pdo->prepare('SELECT OrderStat FROM customerorders WHERE COID = ?');
+        $stmt->execute([$id]);
+        return (int) $stmt->fetchColumn();
+    }//status of
 }//WarehouseOrderTest
