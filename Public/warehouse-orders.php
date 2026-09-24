@@ -5,8 +5,8 @@ require_once '../Includes/csrf.php';
 require_once '../Includes/warehouse_fulfilment.php';
 require_once '../View/warehouse_order_helpers.php';
 
-//The orders this shop's till created: what the customer was billed for and what the warehouse
-//still owes them (docs/superpowers/specs/2026-09-24-pos-warehouse-fulfilment-design.md).
+//The warehouse's own queue: what has to be prepared and sent to a customer, pending first
+//(docs/superpowers/specs/2026-09-24-pos-warehouse-fulfilment-design.md).
 $orders = new WarehouseOrder();
 $me = (int)$_SESSION['user_id'];
 if(!$orders->can($me, $shop_id, WarehouseOrder::VIEW))
@@ -15,8 +15,9 @@ if(!$orders->can($me, $shop_id, WarehouseOrder::VIEW))
     exit;
 }//no Customer Orders right in this shop
 
-$status = isset($_GET['status']) && $_GET['status'] !== '' ? (int)$_GET['status'] : null;
-$rows = $orders->listFor($shop_id, $me, 'ours', $status);
+//Pending first, because an order nobody has picked up is the one that needs a person.
+$status = isset($_GET['status']) ? ($_GET['status'] === '' ? null : (int)$_GET['status']) : WarehouseOrder::PENDING;
+$rows = $orders->listFor($shop_id, $me, 'incoming', $status);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -35,10 +36,10 @@ $rows = $orders->listFor($shop_id, $me, 'ours', $status);
                 <div class="container-fluid">
                     <?= wo_flash() ?>
                     <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                        <h5 class="card-title fw-semibold mb-0">Customer Orders</h5>
+                        <h5 class="card-title fw-semibold mb-0">Warehouse Orders</h5>
                         <form method="get" class="ms-auto">
                             <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
-                                <option value="">All statuses</option>
+                                <option value=""<?= $status === null ? ' selected' : '' ?>>All statuses</option>
                                 <?php foreach([WarehouseOrder::PENDING, WarehouseOrder::PREPARING, WarehouseOrder::READY,
                                     WarehouseOrder::DISPATCHED, WarehouseOrder::COMPLETED, WarehouseOrder::CANCELLED] as $option) { ?>
                                 <option value="<?= (int)$option ?>"<?= $status === $option ? ' selected' : '' ?>><?= wo_h(wo_status_name($option)) ?></option>
@@ -46,14 +47,13 @@ $rows = $orders->listFor($shop_id, $me, 'ours', $status);
                             </select>
                         </form>
                     </div>
-                    <p class="mb-3">Every sale that included something this shop could not hand over is here. The order is
-                        created by the till; the warehouse prepares the rest and sends it to the customer.</p>
+                    <p class="mb-3">Customers have paid for these items. Prepare them, scan them out, and send them.
+                        Anything already handed over at the shop is marked on the order and must never be sent again.</p>
 
                     <div class="card">
                         <div class="card-body">
                             <?php if(empty($rows)) { ?>
-                            <p class="text-muted my-4 text-center">No orders yet. One appears here whenever a sale includes
-                                something the shop does not have.</p>
+                            <p class="text-muted my-4 text-center">Nothing waiting.</p>
                             <?php } else { ?>
                             <div class="table-responsive">
                                 <table class="table table-hover align-middle text-nowrap mb-0">
@@ -66,8 +66,8 @@ $rows = $orders->listFor($shop_id, $me, 'ours', $status);
                                             <th>Wanted by</th>
                                             <th>To send</th>
                                             <th>Balance</th>
+                                            <th>Goes to</th>
                                             <th>Status</th>
-                                            <th>Taken</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -75,13 +75,14 @@ $rows = $orders->listFor($shop_id, $me, 'ours', $status);
                                         <tr>
                                             <td><a href="customer-order.php?id=<?= (int)$row['COID'] ?>"><b><?= wo_h($row['OrderNo']) ?></b></a></td>
                                             <td><?= wo_h($row['InvoiceNo']) ?></td>
-                                            <td><?= wo_h($row['CustName']) ?></td>
+                                            <td><?= wo_h($row['CustName']) ?><br><small class="text-muted"><?= wo_h($row['ShopName']) ?></small></td>
                                             <td><?= wo_h($row['CustPhone']) ?></td>
                                             <td><?= wo_h(wo_date($row['NeededBy'])) ?></td>
                                             <td><?= wo_progress($row['progress']) ?></td>
                                             <td><?= wo_balance($row['money']) ?></td>
+                                            <td><?= (int)$row['DeliverTo'] === WarehouseOrder::DELIVER_PICKUP
+                                                ? 'Collects at the shop' : wo_h($row['DeliveryAddress']) ?></td>
                                             <td><?= wo_status_badge($row['OrderStat']) ?></td>
-                                            <td><?= wo_h(wo_date($row['CreatedAt'])) ?></td>
                                         </tr>
                                         <?php } ?>
                                     </tbody>

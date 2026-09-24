@@ -2,7 +2,7 @@
 //Takes a quantity of a product from a shop's stock batches, oldest first (inventory rows with
 //stock, by INID), the way the transfer page takes it from a batch: each part carries its
 //batch's prices, dates and variation. Used by the scanner upload (TransferScan) and by
-//customer orders (CustomerOrders).
+//warehouse orders (WarehouseOrder).
 class StockAllocator extends Dbh
 {
     //$taken: inventory id => ['tdid' => the line already taking from it on the transfer being
