@@ -602,14 +602,14 @@ $transfer_header_stat = (string)$headerCheck[0]['TransferStat'];
     <?php include '../View/footer.php';?> 
     <!-- footer End  -->
 
-    <script src="../Assets/jquery/transfer_details.js?v=20260922"></script>
+    <script src="../Assets/jquery/transfer_details.js?v=20261001"></script>
     <script src="../Assets/libs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <?php
     if($scan_upload !== null)
     {
         include '../View/modals/scan-upload.php';
         ?>
-    <script src="../Assets/jquery/scan_upload.js?v=20260922"></script>
+    <script src="../Assets/jquery/scan_upload.js?v=20261001"></script>
         <?php
     }//scanner upload
     ?>

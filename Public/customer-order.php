@@ -268,7 +268,7 @@ if($openDispatch !== null)
     <script src="../Assets/js/app.min.js"></script>
     <script src="../Assets/libs/simplebar/dist/simplebar.js"></script>
     <?php if($openDispatch !== null) { ?>
-    <script src="../Assets/jquery/scan_upload.js?v=20260924"></script>
+    <script src="../Assets/jquery/scan_upload.js?v=20261001"></script>
     <?php } ?>
     <script src="../Assets/jquery/warehouse_order.js?v=20260924"></script>
 </body>
