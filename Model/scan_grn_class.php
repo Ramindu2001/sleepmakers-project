@@ -1,7 +1,8 @@
 <?php
 //Scanner upload for a GRN (docs/superpowers/specs/2026-09-22-scanner-upload-design.md, §6).
-//preview() says what an upload would do; apply() does it in one transaction. The lines it
-//writes are the ones manual entry (AJAX/GRN/addGRNDetails.php) would write.
+//preview() says what an upload would do; apply() does it in one transaction. Scanning is the only
+//way stock is added to a GRN; the screen shows no price, so the lines are priced from the stock
+//already here, else from the product itself.
 class GrnScan extends ScanDocument
 {
     const FEATURE = 2;                          //Goods Received
@@ -279,29 +280,22 @@ class GrnScan extends ScanDocument
             'label' => $options['label_price'] ? self::money($batch && $batch['labelPrice'] !== null ? $batch['labelPrice'] : $selling) : '0.00',
         ];
 
-        $typed = (isset($decisions['prices'][$product['PDID']]) && is_array($decisions['prices'][$product['PDID']])) ? $decisions['prices'][$product['PDID']] : [];
+        /*
+         * The GRN screen adds stock and shows no money, so no price is taken from the browser: a line is
+         * priced from the stock that is already here, else from the product itself (Items).
+         *
+         * A product nobody has priced yet cannot come in. Stock at nothing would be sold at nothing, so
+         * the line is refused and the price is set in Items first; the rest of the scan still goes in.
+         */
         $problem = null;
-        foreach(['purchase', 'selling', 'label'] as $field)
+        if($prices['selling'] === null || (float)$prices['selling'] <= 0)
         {
-            if($field === 'label' && !$options['label_price'])
-            {
-                continue;
-            }//label prices not used here
-            if(array_key_exists($field, $typed))
-            {
-                $value = self::money($typed[$field]);
-                if($value === null)
-                {
-                    $problem = $problem ?: 'Enter a valid ' . $field . ' price';
-                    $value = is_scalar($typed[$field]) ? (string)$typed[$field] : '';
-                }
-                $prices[$field] = $value;
-            }//typed prices win
-            elseif($prices[$field] === null)
-            {
-                $problem = $problem ?: 'Enter a valid ' . $field . ' price';
-            }//no price anywhere
-        }//each price
+            $problem = 'No price set for this product. Set its selling price in Items first.';
+        }//never priced
+        if($prices['purchase'] === null)
+        {
+            $prices['purchase'] = '0.00';
+        }//no cost recorded anywhere
 
         $mnf = $produced_date === null ? date('Y-m-d') : $produced_date;
         $exp = date('Y-m-d');                   //manual entry stamps today when the shop has no expiry

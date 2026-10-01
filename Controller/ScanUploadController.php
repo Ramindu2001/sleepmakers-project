@@ -24,8 +24,8 @@ function scan_decisions()
         return (isset($_POST[$key]) && is_array($_POST[$key])) ? $_POST[$key] : [];
     };
     return [
+        //no prices: the stock screens show none, so none is accepted from the browser either
         'leave_out' => array_values(array_filter($list('leave_out'), 'is_string')),
-        'prices' => $list('prices'),
         'dates' => $list('dates'),
         'rack_id' => isset($_POST['rack_id']) ? (int)$_POST['rack_id'] : 0,
         'confirm_duplicate' => !empty($_POST['confirm_duplicate']),
@@ -33,7 +33,8 @@ function scan_decisions()
     ];
 }//decisions
 
-//the preview as the page may see it: without what only apply() needs (batch parts, line ids)
+//the preview as the page may see it: without what only apply() needs (batch parts, line ids) and
+//without the prices - the stock screens show no money, so the prices never reach the browser
 function scan_public_preview(?array $preview)
 {
     if($preview === null)
@@ -41,9 +42,14 @@ function scan_public_preview(?array $preview)
         return null;
     }
     unset($preview['groups']);
+    //whether the shop keeps label prices only matters to apply(); the dialog has no price column
+    if(isset($preview['options']['label_price']))
+    {
+        unset($preview['options']['label_price']);
+    }
     foreach($preview['lines'] as &$line)
     {
-        unset($line['parts'], $line['unit_codes']);
+        unset($line['parts'], $line['unit_codes'], $line['purchase_price'], $line['selling_price'], $line['label_price']);
     }
     unset($line);
     return $preview;

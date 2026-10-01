@@ -1,7 +1,7 @@
 <?php
 //Scanner upload for a transfer (docs/superpowers/specs/2026-09-22-scanner-upload-design.md,
-//§7 and §8). The sending shop scans what it sends: the stock is taken from its batches,
-//oldest first, into the lines manual entry (AJAX/Transfer/addTransferDetail.php) would add.
+//§7 and §8). The sending shop scans what it sends: the stock is taken from its batches, oldest
+//first. Scanning is the only way lines are added to a transfer; the screen shows no price.
 class TransferScan extends ScanDocument
 {
     const FEATURE = 4;                              //Transfer Note

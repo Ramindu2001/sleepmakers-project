@@ -18,9 +18,9 @@
     var burst = { text: '', times: [] };
 
     var COLUMNS = {
+        //the GRN screen adds stock and shows no money: the line's prices come from the product
         grn: function (o) {
-            var c = ['Barcode', 'Product', 'Qty', 'Purchase Price', 'Selling Price'];
-            if (o.label_price) { c.push('Label Price'); }
+            var c = ['Barcode', 'Product', 'Qty'];
             if (o.expiry) { c.push('Mnf Date', 'Exp Date'); }
             return c.concat(['Status', '']);
         },
@@ -230,9 +230,6 @@
         var cells = ['<td class="font-monospace">' + esc(line.barcode || line.key) + '</td>', '<td>' + esc(line.name) + '</td>'];
         if (context === 'grn') {
             cells.push(num(line.qty));
-            cells.push(field(line, 'prices', 'purchase', line.purchase_price, 'number'));
-            cells.push(field(line, 'prices', 'selling', line.selling_price, 'number'));
-            if (opts.label_price) { cells.push(field(line, 'prices', 'label', line.label_price, 'number')); }
             if (opts.expiry) {
                 cells.push(field(line, 'dates', 'mnf', line.mnf_date, 'date'));
                 cells.push(field(line, 'dates', 'exp', line.exp_date, 'date'));
