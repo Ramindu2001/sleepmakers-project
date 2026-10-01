@@ -87,9 +87,10 @@ if(isset($_POST['btn_pending_grn']))
     $TotalDiscount = 0;
     $DiscType = 0;
 
-    $SaleDiscount = $_POST['hiddenSaleDiscount'];
-    $TotalDiscount = $_POST['hiddenTotalDiscount'];
-    $DiscType = $_POST['hiddenDiscountType'];
+    //the stock screen carries no discount fields any more; an older screen still may
+    $SaleDiscount = isset($_POST['hiddenSaleDiscount']) ? $_POST['hiddenSaleDiscount'] : 0;
+    $TotalDiscount = isset($_POST['hiddenTotalDiscount']) ? $_POST['hiddenTotalDiscount'] : 0;
+    $DiscType = isset($_POST['hiddenDiscountType']) ? $_POST['hiddenDiscountType'] : 0;
 
     // echo "SaleDiscount: ".$SaleDiscount."<br>";
     // echo "TotalDiscount: ".$TotalDiscount."<br>";       
@@ -247,9 +248,10 @@ if(isset($_POST['btn_verify_grn']))
     $TotalDiscount = 0;
     $DiscType = 0;
 
-    $SaleDiscount = $_POST['hiddenSaleDiscount'];
-    $TotalDiscount = $_POST['hiddenTotalDiscount'];
-    $DiscType = $_POST['hiddenDiscountType'];
+    //the stock screen carries no discount fields any more; an older screen still may
+    $SaleDiscount = isset($_POST['hiddenSaleDiscount']) ? $_POST['hiddenSaleDiscount'] : 0;
+    $TotalDiscount = isset($_POST['hiddenTotalDiscount']) ? $_POST['hiddenTotalDiscount'] : 0;
+    $DiscType = isset($_POST['hiddenDiscountType']) ? $_POST['hiddenDiscountType'] : 0;
 
     // echo "SaleDiscount: ".$SaleDiscount."<br>";
     // echo "TotalDiscount: ".$TotalDiscount."<br>";       
