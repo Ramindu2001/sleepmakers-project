@@ -8,7 +8,8 @@ include "../../Model/shop_class.php";
 $shop_id = $_SESSION['shop_id'];
 $transfer_header_id = (int)$_GET['header_id'];
 
-$sql = "SELECT * FROM transferdetails 
+//no price column is selected or printed: the transfer screen moves stock and shows no money
+$sql = "SELECT TDID, INID, Barcode, ItemName, VariationName, TransferQty, ReceivedQty, CurrentQty FROM transferdetails 
 INNER JOIN inventory ON inventory.INID = transferdetails.InventoryID
 INNER JOIN products ON products.PDID = transferdetails.products_PDID
 LEFT JOIN variations ON variations.VRID = transferdetails.VariationID
@@ -45,9 +46,6 @@ if($to_shop == $shop_id)
 }//receive shop
 
 echo "<th>Avl Qty</th>";
-echo "<th>Unit Purchase Price</th>";
-echo "<th>Unit Selling Price</th>";
-echo "<th>Total Amount</th>";
 echo "<th>Action</th>";
 echo "</tr>";
 foreach($dbData as $row)
@@ -76,9 +74,6 @@ foreach($dbData as $row)
     }//receive shop
     
     echo "<td>".$row['CurrentQty']."</td>";
-    echo "<td>".$row['UnitPurchasePrice']."</td>";
-    echo "<td>".$row['UnitSellingPrice']."</td>";
-    echo "<td>".$row['TransferTotalAmount']."</td>";
     echo "<td>";
     echo "<button type='button' class='btn_transfer_edit btn border border-primary mr-1'><i class='ti ti-edit'></i></button>";
     echo "<button type='button' class='btn_transfer_delete btn border border-danger'><i class='ti ti-x'></i></button>";

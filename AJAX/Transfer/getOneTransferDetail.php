@@ -8,7 +8,8 @@ $trasnfer_detail_id = $_GET['detail_id'];
 
 $dbObj = new DBTransactions();
 
-$sql = "SELECT * FROM transferdetails 
+//only what the quantity row needs - no price leaves the server
+$sql = "SELECT TDID, products.Barcode, products.ItemName, transferdetails.products_PDID, transferdetails.InventoryID, TransferQty, ReceivedQty, inventory.CurrentQty FROM transferdetails
 INNER JOIN products ON products.PDID = transferdetails.products_PDID
 INNER JOIN inventory ON inventory.INID = transferdetails.InventoryID
 LEFT JOIN variations ON variations.VRID = transferdetails.VariationID
