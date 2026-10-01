@@ -173,7 +173,6 @@ include '../Includes/authcheck.php';
                                 <th>Transfer From</th>
                                 <th>Transfer To</th>
                                 <th>Row Count</th>
-                                <th>Transfer Amount</th>
                                 <th>Type</th>
                                 <th>Added By</th>
                                 <th>Status</th>
@@ -216,7 +215,6 @@ include '../Includes/authcheck.php';
                                     <td><?php echo $from_shop;?></td>
                                     <td><?php echo $to_shop;?></td>
                                     <td><?php echo $row['TransferTotalCount'];?></td>
-                                    <td><?php echo $row['TransferTotalAmount'];?></td>
 
                                     <!-- transfer type -->
                                     <td>
