@@ -160,8 +160,6 @@ include '../Includes/authcheck.php';
                             <th>Date</th>
                             <th>Invoice No</th>
                             <th>Items</th>
-                            <th>Purchase Total</th>
-                            <th>Selling Total</th>
                             <th>Reference</th>
                             <th>Supplier</th>
                             <th>Added By</th>
@@ -184,8 +182,6 @@ include '../Includes/authcheck.php';
                                     <td><?php echo $row['EffectiveDate'];?></td>
                                     <td><?php echo $row['InvoiceNo'];?></td>
                                     <td text-align="center"><?php echo $row['ItemCount'];?></td>
-                                    <td text-align="right"><?php echo $row['TotalPurchasePrice'];?></td>
-                                    <td text-align="right"><?php echo $row['TotalSellPrice'];?></td>
                                     <td text-align="right"><?php echo $row['refference'];?></td>
                                     <td text-align="right"><?php echo $row['SupplierName'];?></td>
                                     <td><?php echo $row['UserName'];?></td>

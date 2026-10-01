@@ -28,8 +28,10 @@ if($transfer_qty <= 0 || $receive_qty < 0 || $receive_qty > $transfer_qty)
     exit;
 }//qty not valid
 
-$purchase_price = $_GET['purchase_price'];
-$selling_price = $_GET['selling_price'];
+//the line keeps the prices the stock carries: the transfer screen moves stock and shows no money,
+//so no price is accepted from the browser
+$purchase_price = $line['UnitPurchasePrice'];
+$selling_price = $line['UnitSellingPrice'];
 //dates change only from a page that shows the date fields (a shop that tracks expiry);
 //otherwise the line keeps its dates. An emptied field means no date, never today's date
 $mnf_date = isset($_GET['mnf_date']) ? $tranObj->cleanDate($_GET['mnf_date']) : $line['MnfDate'];

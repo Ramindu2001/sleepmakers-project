@@ -85,8 +85,6 @@ else
         }
     }
 
-    include "../View/modals/add_grn_product.php";
-
     //scanner upload (docs/superpowers/specs/2026-09-22-scanner-upload-design.md): open GRNs, GRN create/edit right
     require_once '../Includes/scan_upload.php';
     $grnScanAllowed = $grn_header_stat < 2 && (new ShopAccess())->hasFeatureRight($_SESSION['user_id'], $shop_id, GrnScan::FEATURE, GrnScan::RIGHTS);
@@ -219,10 +217,6 @@ else
                     $effective_date = $grnOne[0]['EffectiveDate'];
                     $supplier_id = $grnOne[0]['Suppliers_SPID'];
 
-                    $DiscType = $grnOne[0]['PurchDiscType'];
-                    $SaleDiscount = $grnOne[0]['PurchDisc'];
-                    $TotalDiscount = $grnOne[0]['TotalDisc'];
-
                 ?>
                             <p>
                                 GRN No: <?php echo $grn_no;?><br>
@@ -253,23 +247,19 @@ else
                         <div class="card-header">
                             <h5 class="card-title fw-semibold mb-2" style="margin-top: 0px;">
                                 GRN Detail
-                                <button class="btn btn-primary float-end" id="btn_open_grn_products">Add
-                                    Products</button>
                                 <?php if($grnScanAllowed) { ?>
-                                <button type="button" class="btn btn-outline-primary float-end me-2 btn-scan-upload"><i
+                                <button type="button" class="btn btn-primary float-end btn-scan-upload"><i
                                         class="ti ti-barcode"></i> Scan / Upload</button>
+                                <?php } else if($grn_header_stat < 2) { ?>
+                                <!-- scanning is the only way in, so say so rather than leave an empty screen -->
+                                <small class="text-muted float-end">Stock is added by scanning. Ask an
+                                    administrator for the Goods Received scan right.</small>
                                 <?php } ?>
                             </h5>
                         </div>
                         <div class="card-body">
                             <div class="container-fluid">
                                 <div class="container table-responsive">
-                                    <div class="row">
-                                        <div class="col-md-12">
-                                            <span class="text-danger">Note: - Prices must be entered in the selling unit
-                                                price.</span>
-                                        </div>
-                                    </div>
                                     <!-- hidden input -->
                                     <input type="hidden" name="hide_header_id" id="hide_header_id"
                                         value="<?php echo $grn_header_id;?>">
@@ -282,74 +272,28 @@ else
                             {
 
                             ?>
-                                    <table class="table table-hover" id="tbl_add_details">
+                                    <!-- One line's quantity, shown only while that line is being corrected. This
+                                         screen adds and counts stock: it shows no price, and correcting a line
+                                         leaves the line's prices exactly as they were. -->
+                                    <table class="table table-hover" id="tbl_edit_line" style="display:none;">
                                         <tr>
                                             <th style="min-width: 250px;">Product</th>
-                                            <?php 
-                                        if($shopObj->hasVariation($shop_id))
-                                        {
-                                            ?>
-                                            <th style="min-width:150px;">Variations</th>
-                                            <?php 
-                                        }//has variation
-                                    ?>
                                             <th style="min-width:150px;">Qty</th>
-                                            <th style="min-width:150px;">Purchase Price</th>
-
-                                            <?php 
-                                        if($shopObj->hasLabelPrice($shop_id))
-                                        {
-                                            ?>
-                                            <th style="min-width:150px;">Label Price</th>
-                                            <?php 
-                                        }//has label price
-                                    ?>
-
-                                            <th style="min-width:150px;">Selling Price</th>
-
-                                            <?php 
-                                        if($shopObj->hasExpiry($shop_id))
-                                        {
-                                            ?>
-                                            <th style="min-width:120px;">Mnf Date</th>
-                                            <th style="min-width:120px;">Exp Date</th>
-                                            <?php 
-                                        }//has expiry
-
+                                            <?php
                                         if($shopObj->hasRacks($shop_id))
                                         {
                                             ?>
                                             <th style="min-width:150px;">Section & Racks</th>
-                                            <?php 
+                                            <?php
                                         }//has racks
                                     ?>
                                             <th style="min-width:150px;">Action</th>
                                         </tr>
                                         <tr>
                                             <td>
-                                                <select name="cmb_product" id="cmb_product"
-                                                    class="form-select required">
-                                                    <option value="">=== Select an Item ===</option>
-                                                </select>
-                                                <span class="text-danger" style="display: none;"
-                                                    id="product_warning">Please select product</span>
+                                                <p id="edit_line_product" class="mb-0 fw-semibold"></p>
                                                 <input type="hidden" name="ids" id="ids" value="0">
-                                                <br>
-                                                <p id="product_detail"></p>
                                             </td>
-
-                                            <?php 
-                                        if($shopObj->hasVariation($shop_id))
-                                        {
-                                            ?>
-                                            <td>
-                                                <select name="cmb_variation" id="cmb_variation" class="form-select">
-                                                    <option value="0">No Variation</option>
-                                                </select>
-                                            </td>
-                                            <?php 
-                                        }//has variation
-                                    ?>
 
                                             <td>
                                                 <input type="number" step="0.001" name="prod_qty" id="prod_qty"
@@ -358,57 +302,8 @@ else
                                                     Valid Value</span>
                                             </td>
 
-                                            <td>
-                                                <input type="number" step="0.01" name="purchase_price"
-                                                    id="purchase_price" class="form-control required"
-                                                    placeholder="Purchase Price">
-                                                <span class="text-danger" id="pur_warning" style="display: none;">Not
-                                                    Valid Value</span>
-                                            </td>
-
-                                            <?php 
-                                    if($shopObj->hasLabelPrice($shop_id))
-                                    {
-                                        ?>
-                                            <td>
-                                                <input type="number" step="0.01" name="label_price" id="label_price"
-                                                    class="form-control required" placeholder="Label Price">
-                                                <span class="text-danger" id="lab_warning" style="display: none;">Not
-                                                    Valid Value</span>
-                                            </td>
-                                            <?php 
-                                    }//has label price
-                                    ?>
-
-                                            <td>
-                                                <input type="number" step="0.01" name="selling_price" id="selling_price"
-                                                    class="form-control required" placeholder="Selling Price">
-                                                <span class="text-danger" id="sel_warning" style="display: none;">Not
-                                                    Valid Value</span>
-                                            </td>
-
-                                            <?php 
-                                        if($shopObj->hasExpiry($shop_id))
-                                        {
-                                            ?>
-                                            <td>
-                                                <input type="date" name="mnf_date" id="mnf_date"
-                                                    class="form-control mb-3 required" placeholder="Manufacture Date">
-                                                <span class="text-danger" id="mnf_warning" style="display: none;">Not
-                                                    Valid Date</span>
-                                            </td>
-
-                                            <td>
-                                                <input type="date" name="exp_date" id="exp_date"
-                                                    class="form-control required" placeholder="Expire Date">
-                                                <span class="text-danger" id="exp_warning" style="display: none;">Not
-                                                    Valid Date</span>
-                                            </td>
-                                            <?php 
-                                        }//has expiry
-                                    ?>
                                             <!-- shop has racks -->
-                                            <?php 
+                                            <?php
                                         if($shopObj->hasRacks($shop_id))
                                         {
                                             ?>
@@ -416,8 +311,7 @@ else
                                                 <!-- select section -->
                                                 <select name="cmb_section" id="cmb_section" class="form-select"
                                                     style="min-width:100px;">
-                                                    <!-- <option>Select Section</option> -->
-                                                    <?php 
+                                                    <?php
                                                     $sectionObj = new Section();
                                                     $sectionData = $sectionObj->getAllSections($shop_id);
                                                     foreach($sectionData as $row)
@@ -425,40 +319,38 @@ else
                                                         ?>
                                                     <option value="<?php echo $row['SEID'];?>">
                                                         <?php echo $row['SectionName'];?></option>
-                                                    <?php 
-                                                    }//foreach  
+                                                    <?php
+                                                    }//foreach
                                                     ?>
                                                 </select>
 
                                                 <!-- Select Racks -->
                                                 <select name="cmb_racks" id="cmb_racks" class="form-select mt-1"
                                                     style="min-width:100px;">
-                                                    <?php 
+                                                    <?php
                                                     $rackData = $sectionObj->getAllRack($shop_id);
                                                     foreach($rackData as $row)
                                                     {
                                                         ?>
                                                     <option value="<?php echo $row['RKID'];?>">
                                                         <?php echo $row['RackName'];?></option>
-                                                    <?php 
+                                                    <?php
                                                     }//foreach
                                                     ?>
                                                 </select>
                                             </td>
-                                            <?php 
+                                            <?php
                                         }//has racks
                                     ?>
 
                                             <td>
-                                                <button type="button" name="btn_add_grn_detail" id="btn_add_grn_detail"
-                                                    class="btn border border-success bg-success">
-                                                    <i class="ti ti-plus"></i>
-                                                </button>
-
-                                                <button type="button" name="btn_edit_grn_detail"
-                                                    id="btn_edit_grn_detail"
+                                                <button type="button" name="btn_edit_grn_detail" id="btn_edit_grn_detail"
                                                     class="btn border border-warning bg-warning">
-                                                    <i class="ti ti-edit"></i>
+                                                    <i class="ti ti-check"></i>
+                                                </button>
+                                                <button type="button" id="btn_cancel_edit_line"
+                                                    class="btn border border-secondary">
+                                                    <i class="ti ti-x"></i>
                                                 </button>
                                             </td>
                                         </tr>
@@ -482,22 +374,8 @@ else
                                     ?>
 
                                             <th style="min-width:100px;">Qty</th>
-                                            <th style="min-width:100px;">Purchase Price</th>
 
-                                            <?php 
-                                    if($shopObj->hasLabelPrice($shop_id))
-                                    {   
-                                        ?>
-                                            <th style="min-width:100px;">Label Price</th>
-                                            <?php 
-                                    }//has label price
-                                    ?>
-
-                                            <th style="min-width:100px;">Selling Price</th>
-                                            <th style="min-width:100px;">Total Purchase</th>
-                                            <th style="min-width:100px;">Total Selling</th>
-
-                                            <?php 
+                                            <?php
                                     if($shopObj->hasExpiry($shop_id))
                                     {
                                         ?>
@@ -525,7 +403,8 @@ else
                                         </tr>
                                         <tbody id="tbody">
                                             <?php 
-                                    $sql = "SELECT GDID, PDID, Barcode, ItemName, VRID, VariationName, InitQty, UnitPurchasePrice, UnitLabelPrice, UnitSellPrice, TotalPurchasePrice, TotalSellPrice, MnfDate, ExpDate, SEID, SectionName, RKID, RackName, UNID, ShortName FROM grndetails
+                                    //no price is selected: this screen counts stock and shows no money
+                                    $sql = "SELECT GDID, PDID, Barcode, ItemName, VRID, VariationName, InitQty, MnfDate, ExpDate, SEID, SectionName, RKID, RackName, UNID, ShortName FROM grndetails
                                     LEFT JOIN products ON products.PDID = grndetails.products_PDID
                                     LEFT JOIN variations ON variations.VRID = grndetails.VariationID
                                     LEFT JOIN units ON units.UNID = products.PurchaseUnit
@@ -536,22 +415,17 @@ else
                                     $dbObj = new DBTransactions();
                                     $dbData = $dbObj->getData($sql);    
 
-                                    $grn_purchase_price = 0;
                                     $grn_item_count = 0;
                                     $grn_row_count = 0;
 
-                                  
+
                                     foreach($dbData as $row)
                                     {
                                         $grn_row_count += 1;
                                         $grn_item_count += floatval($row['InitQty']);
-                                        $grn_purchase_price += floatval($row['TotalPurchasePrice']);
                                     ?>
-                                            <tr data-id="<?php echo $row['GDID'];?>">
-                                                <td style="display: none;"><?php echo $row['GDID'];?></td><!-- 0 -->
-                                                <td style="display: none;"><?php echo $row['InitQty'];?></td><!-- 1 -->
-                                                <td style="display: none;"><?php echo $row['TotalPurchasePrice'];?></td>
-                                                <!-- 2 -->
+                                            <tr data-id="<?php echo $row['GDID'];?>"
+                                                data-qty="<?php echo $row['InitQty'];?>">
 
                                                 <td>
                                                     <?php echo $row['Barcode'];?> <br>
@@ -569,32 +443,19 @@ else
 
                                                 <td><?php echo $row['InitQty'] + 0 . " " . $row['ShortName'];?></td>
                                                 <!-- 3 -->
-                                                <td><?php echo $row['UnitPurchasePrice'];?></td><!-- 4 -->
 
-                                                <?php 
-                                        if($shopObj->hasLabelPrice($shop_id))
-                                        {
-                                            ?>
-                                                <td><?php echo $row['UnitLabelPrice'];?></td><!-- 5 -->
-                                                <?php 
-                                        }//has label price
-                                        ?>
-
-                                                <td><?php echo $row['UnitSellPrice'];?></td><!-- 6 -->
-                                                <td><?php echo $row['TotalPurchasePrice'];?></td><!-- 7 -->
-                                                <td><?php echo $row['TotalSellPrice'];?></td><!-- 8 -->
-
-                                                <?php 
+                                                <?php
                                         if($shopObj->hasExpiry($shop_id))
                                         {
                                             ?>
                                                 <td><?php echo $row['MnfDate'];?></td><!-- 9 -->
                                                 <td><?php echo $row['ExpDate'];?></td><!-- 10 -->
-                                                <?php 
+                                                <?php
                                         }//has expiry
 
-                                        //has racks
-                                        if($shopObj->hasExpiry($shop_id))
+                                        //has racks (the header shows this column for a shop with racks, so the
+                                        //cell has to follow the same test or the columns no longer line up)
+                                        if($shopObj->hasRacks($shop_id))
                                         {
                                             ?>
                                                 <td>
@@ -604,12 +465,7 @@ else
                                                 <?php 
                                         }//has racks
                                         ?>
-                                                <td style="display: none;"><?php echo $row['PDID'];?></td><!-- 12 -->
-                                                <td style="display: none;"><?php echo $row['InitQty'];?></td><!-- 13 -->
-                                                <td style="display: none;"><?php echo $row['SEID'];?></td><!-- 14 -->
-                                                <td style="display: none;"><?php echo $row['RKID'];?></td><!-- 15 -->
-                                                <td style="display: none;"><?php echo $row['VRID'];?></td><!-- 16 -->
-                                                <?php  
+                                                <?php
                                         if($grn_header_stat < 2)
                                         {
                                             ?>
@@ -653,65 +509,12 @@ else
                                                     </td>
                                                 </tr>
 
-                                                <tr>
-                                                    <th>Total Purchase</th>  
-                                                    <td>
-                                                        <h4 id="sub_purchase_price" style="text-align: right;">
-                                                            <b><?php echo $grn_purchase_price;?></b></h4>
-                                                    </td>
-                                                </tr>
-
-                                                <tr>
-                                                        <th>
-                                                            <b class="det">Purch Disc. Type</b>
-                                                        </th>
-                                                        <td colspan="2">
-                                                            <select name="SaleDiscountType" id="SaleDiscountType" class="form-select" >
-                                                                <option value="1" <?php echo ($DiscType == 1) ? 'selected' : ''; ?>>Percentage</option>
-                                                                <option value="2" <?php echo ($DiscType == 2) ? 'selected' : ''; ?>>Flat Amount</option>                                                                
-                                                            </select>
-                                                        </td>
-                                                </tr>
-                                                <tr>
-                                                        <th>
-                                                            <b class="det">Purch Disc.</b>
-                                                        </th>
-
-                                                        <td colspan="2">
-                                                            <input type="text" name="saleDiscount" id="saleDiscount" class="form-control text-end"  value=<?php echo number_format((float)$SaleDiscount,2);?>>
-                                                            
-                                                        </td>
-                                                </tr>
-
-                                                <tr>
-                                                        <th >
-                                                            <b class="det">Total Disc.</b>
-                                                        </th>
-                                                        <td colspan="2">
-                                                            <input type="text" name="totalDiscount" id="totalDiscount" class="form-control text-end" value=<?php echo number_format((float)$TotalDiscount,2);?> readonly>
-                                                        </td>
-                                                </tr>
-                                              
-
-                                                <tr>
-                                                    <th>Grand Total</th>  
-                                                    <td>
-                                                        <h4 id="grand_total" style="text-align: right;">
-                                                            <b><?php echo $grn_purchase_price;?></b>
-                                                        </h4>
-                                                    </td>
-                                                </tr>
-                                                                                                
                                             </thead>
                                         </table>
                                     </div>
                                 </div>
                                 <!-- submit GRN -->
                                 <form action="../Controller/grnController.php" method="POST" id="grn-form">
-
-                                <input type="hidden" name="hiddenSaleDiscount" id="hiddenSaleDiscount">
-                                <input type="hidden" name="hiddenTotalDiscount" id="hiddenTotalDiscount">
-                                <input type="hidden" name="hiddenDiscountType" id="hiddenDiscountType">
 
                                 <label for="" class="form-label">Select Supplier</label>
                                     <select name="cmb_edit_supplier" id="cmb_edit_supplier" class="form-select"
@@ -731,88 +534,7 @@ else
                                     </select>
                                     <input type="hidden" name="hide_grnheader_id" id="hide_grnheader_id"
                                         value="<?=$grn_header_id?>">
-                                        <div class="row">
-                                <div class="col-md-10 mt-2">
-                                    <div class="p-2">
-                                        <div class="row mb-3" id="payment_methods">
-                                            <div id="payment_method" class="row">
-                                                <div class="col-md-4 mb-2">
-                                                    <label for="" class="form-label">Payment Type</label>
-                                                    <?php                                     
-                                            if($grn_header_stat == '2')
-                                            {   
-                                            ?>
-                                                    <select name="pay_id[]" id="pay_id" class="form-select" disabled>
-                                                        <?php 
-                                                $sql = "SELECT * FROM shoppaymethod
-                                                INNER JOIN paymethod ON paymethod.PMID = shoppaymethod.paymethod_PMID
-                                                WHERE shop_SHID = ".$shop_id." AND (paymethod.PMID!=6 AND paymethod.PMID!=4  AND paymethod.PMID!=9  AND paymethod.PMID!=10 AND paymethod.PMID!=12);";
-                                                $dbObj = new DBTransactions();
-                                                $dbPaymethods = $dbObj->getData($sql);
-                                                $count = 0;
-                                                foreach($dbPaymethods as $row)
-                                                {
-                                                    $is_checked = $count==0 ? 'checked' : '';
-                                                    ?>
-                                                        <option value="<?php echo $row['paymethod_PMID'];?>">
-                                                            <?php echo $row['PaymethodName'];?></option>
-                                                        <?php 
-                                                    $count += 1;
-                                                }//foreach
-                                            ?>
-                                                    </select>
-                                                </div>
-                                                <div class="col-md-4 mb-2">
-                                                    <label for="paid-input" class="form-label">Paid</label>
-                                                    <input type="text" class="form-control" name="paid[]"
-                                                        id="paid-input" placeholder="0.00" disabled>
-                                                </div>
-                                                <!-- <div class="col-md-4 mb-2">
-                                            <a href="javascript:void(0);" class="btn btn-primary mt-4" id="add-payment" onclick="addPayment()">Add Payment</a>
-                                        </div> -->
 
-                                                <?php                                     
-                                            }
-                                            else
-                                            {
-                                        ?>
-                                                <select name="pay_id[]" id="pay_id" class="pay_id form-select">
-                                                    <?php 
-                                                $sql = "SELECT * FROM shoppaymethod
-                                                INNER JOIN paymethod ON paymethod.PMID = shoppaymethod.paymethod_PMID
-                                                WHERE shop_SHID = ".$shop_id." AND (paymethod.PMID!=6 AND paymethod.PMID!=4  AND paymethod.PMID!=9  AND paymethod.PMID!=10 AND paymethod.PMID!=12);";
-                                                $dbObj = new DBTransactions();
-                                                $dbPaymethods = $dbObj->getData($sql);
-                                                $count = 0;
-                                                foreach($dbPaymethods as $row)
-                                                {
-                                                    $is_checked = $count==0 ? 'checked' : '';
-                                                    ?>
-                                                    <option value="<?php echo $row['paymethod_PMID'];?>">
-                                                        <?php echo $row['PaymethodName'];?></option>
-                                                    <?php 
-                                                    $count += 1;
-                                                }//foreach
-                                            ?>
-                                                </select>
-                                            </div>
-                                            <div class="col-md-4 mb-2">
-                                                <label for="paid-input" class="form-label">Paid</label>
-                                                <input type="text" class="form-control" name="paid[]" id="paid-input"
-                                                    placeholder="0.00">
-                                            </div>
-                                            <div class="col-md-4 mb-2">
-                                                <a href="javascript:void(0);" class="btn btn-primary mt-4"
-                                                    id="add-payment" onclick="addPayment()">Add Payment</a>
-                                            </div>
-                                            <?php                                     
-                                            }                                           
-                                        ?>
-
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                                     <div>
                                         <?php 
                                     if($grn_header_stat == '0')
@@ -970,272 +692,9 @@ else
     <!-- footer End  -->
 
     <!-- <script src="../Assets/jquery/grn.js"></script> -->
-    <script src="../Assets/jquery/grn_detail.js?v=20260922"></script>
-
-    <script>
-        function addChq()
-        {
-            var payment =`
-                        <div id="chequeDiv" class="col-md-12 mb-2 row">
-                                <div class="col-md-2">
-                                    <label for="chqNo" class="form-label">Cheque No</label>
-                                    <input type="text" name="chqNo[]" id="chqNo" class="form-control" placeholder="Cheque No">
-                                </div>
-                                <div class="col-md-2">
-                                    <label for="chqdate" class="form-label">Cheque Date</label>
-                                    <input type="date" name="chqdate[]" id="chqdate" class="form-control">
-                                </div>
-                                <div class="col-md-2">
-                                    <label for="chqbank" class="form-label">Bank</label>
-                                    <input type="text" name="chqbank[]" id="chqbank" class="form-control" placeholder="Ex: BOC">
-                                </div>
-                                <div class="col-md-2">
-                                    <label for="chqamount" class="form-label">Cheque Amount</label>
-                                    <input type="text" name="chqAmount[]" id="chqamount" class="form-control" placeholder="Ex: 2000">
-                                </div>
-                                <div class="col-md-4">
-                                <a href='javascript:void(0);' class='remove-payment btn btn-danger mt-4' id='remove-payment' onclick='remove_cheque(this)' ><i class='ti ti-trash'></i></a>
-                                <a href='javascript:void(0);' class='btn btn-primary mt-4' onclick='addChq()' ><i class='ti ti-plus'></i></a>
-                                </div>
-                            </div>
-                        `;
-                            $("#payment_method").append(payment);
-        }
-        function addChqsettlement()
-        {
-            var payment =`
-                        <div id="chequeDiv" class="col-md-12 mb-2 row">
-                                <div class="col-md-4">
-                                
-                                </div>
-                                <div class="col-md-4">
-                                    <label for="transferCheque" class="form-label">Select Cheque</label>
-                                    <select class="transferCheque form-select" name="transferCheque" id="transferCheque">
-                                    <option value="" > Select Cheque</option>
-                                    <?php 
-                                    $sql = "SELECT * FROM custcheq
-                                    INNER JOIN custchqdetail ON custchqdetail.CCQID = custcheq.CCQID
-                                    INNER JOIN customers c ON c.CTID=custcheq.cust_CTID
-                                    WHERE custcheq.shop_SHID = ".$shop_id." AND custcheq.chq_stat=1;";
-                                    $dbObj = new DBTransactions();
-                                    $dbPaymethods = $dbObj->getData($sql);
-                                    $count = 0;
-                                    foreach($dbPaymethods as $row)
-                                    {
-                                        ?>
-                                        <option value="<?=$row["CCQID"]?>"><?=$row["bank"]?> - <?=$row["chqNo"]?> - <?=$row["CustName"]?> - <?=$row["chqAmount"]?></option>
-                                        <?php
-                                    }
-                                    ?>
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                <a href='javascript:void(0);' class='remove-payment btn btn-danger mt-4' id='remove-payment' onclick='remove_cheque(this)' ><i class='ti ti-trash'></i></a>
-                                <a href='javascript:void(0);' class='btn btn-primary mt-4' onclick='addChqsettlement()' ><i class='ti ti-plus'></i></a>
-                                </div>
-                            </div>
-                            `;
-                            $("#payment_method").append(payment);
-        }
-    
-        $(document).ready(function() {
-
-        
-        $('#grn-form').submit(function() {
-            return validateForm();
-        });
-        $(document).on("change", ".transferCheque", function() {
-            var selectedValue = $(this).val();
-            var isDuplicate = false;
-            if (selectedValue != "") {
-                $('.transferCheque').not(this).each(function() {
-                    if ($(this).val() === selectedValue) {
-                        isDuplicate = true;
-                        return false; // break out of the loop
-                    }
-                });
-
-                if (isDuplicate) {
-                    alert('Duplicate value selected!');
-                    $(this).val("");
-                } 
-            }
-        });
-        $(document).on("change", ".pay_id", function() {
-            var selectedValue = $(this).val();
-            var isDuplicate = false;
-            if (selectedValue != "") {
-                $('.pay_id').not(this).each(function() {
-                    if ($(this).val() === selectedValue) {
-                        isDuplicate = true;
-                        return false; // break out of the loop
-                    }
-                });
-
-                if (isDuplicate) {
-                    alert('Duplicate value selected!');
-                    $(this).val("");
-                } else {
-                    if ($(this).val() == 5) {
-                        var payment =`
-                        <div id="chequeDiv" class="col-md-12 mb-2 row">
-                                <div class="col-md-2">
-                                    <label for="chqNo" class="form-label">Cheque No</label>
-                                    <input type="text" name="chqNo[]" id="chqNo" class="form-control" placeholder="Cheque No">
-                                </div>
-                                <div class="col-md-2">
-                                    <label for="chqdate" class="form-label">Cheque Date</label>
-                                    <input type="date" name="chqdate[]" id="chqdate" class="form-control">
-                                </div>
-                                <div class="col-md-2">
-                                    <label for="chqbank" class="form-label">Bank</label>
-                                    <input type="text" name="chqbank[]" id="chqbank" class="form-control" placeholder="Ex: BOC">
-                                </div>
-                                <div class="col-md-2">
-                                    <label for="chqamount" class="form-label">Cheque Amount</label>
-                                    <input type="text" name="chqAmount[]" id="chqamount" class="form-control" placeholder="Ex: 2000">
-                                </div>
-                                <div class="col-md-4">
-                                <a href='javascript:void(0);' class='remove-payment btn btn-danger mt-4' id='remove-payment' onclick='remove_cheque(this)' ><i class='ti ti-trash'></i></a>
-                                <a href='javascript:void(0);' class='btn btn-primary mt-4' onclick='addChq()' ><i class='ti ti-plus'></i></a>
-                                </div>
-                            </div>
-                            `;
-                            
-                            $("#payment_method").append(payment);
-
-                    } 
-                    else if($(this).val() == 13)
-                    {
-                        var payment =`
-                        <div id="chequeDiv" class="col-md-12 mb-2 row">
-                                <div class="col-md-4">
-
-                                </div>
-                                <div class="col-md-4">
-                                    <label for="transferCheque" class="form-label">Select Cheque</label>
-                                    <select class="transferCheque form-select" name="transferCheque[]" id="transferCheque">
-                                    <option value="" > Select Cheque</option>
-                                    <?php 
-                                    $sql = "SELECT * FROM custcheq
-                                    INNER JOIN custchqdetail ON custchqdetail.CCQID = custcheq.CCQID
-                                    INNER JOIN customers c ON c.CTID=custcheq.cust_CTID
-                                    WHERE custcheq.shop_SHID = ".$shop_id." AND custcheq.chq_stat=1;";
-                                    $dbObj = new DBTransactions();
-                                    $dbPaymethods = $dbObj->getData($sql);
-                                    $count = 0;
-                                    foreach($dbPaymethods as $row)
-                                    {
-                                        ?>
-                                        <option value="<?=$row["CCQID"]?>"><?=$row["bank"]?> - <?=$row["chqNo"]?> - <?=$row["CustName"]?> - <?=$row["chqAmount"]?></option>
-                                        <?php
-                                    }
-                                    ?>
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                <a href='javascript:void(0);' class='remove-payment btn btn-danger mt-4' id='remove-payment' onclick='remove_cheque(this)' ><i class='ti ti-trash'></i></a>
-                                <a href='javascript:void(0);' class='btn btn-primary mt-4' onclick='addChqsettlement()' ><i class='ti ti-plus'></i></a>
-                                </div>
-                            </div>
-                            `;
-                            
-                            $("#payment_method").append(payment);
-
-                    }
-                    else {
-
-                    }
-                }
-            }
-        })
-           
-    
-     });
-    //Added by Imila on 2024-09-27
-    function remove_cheque(item) {
-        var value = $(item).attr("id");
-        $(item).parent().parent().remove();
-        balance();
-
-    }
-
-    function addPayment() {
-        var payment = "<div class='col-md-12 mb-2 row'>" +
-            "<div class='col-md-4'>" +
-            "<label for='' class='form-label'>Payment Type</label>" +
-            "<select name='pay_id[]' id='pay_id' class='pay_id form-select'>" +
-            "<option value=''>Select payment method</option>" +
-            <?php 
-                            $sql = "SELECT * FROM shoppaymethod
-                            INNER JOIN paymethod ON paymethod.PMID = shoppaymethod.paymethod_PMID
-                            WHERE shop_SHID = ".$shop_id.";";
-                            $dbObj = new DBTransactions();
-                            $dbPaymethods = $dbObj->getData($sql);
-                            $count = 0;
-                            foreach($dbPaymethods as $row)
-                            {
-                                $is_checked = $count==0 ? 'checked' : '';
-                                ?> "<option value='<?php echo $row['paymethod_PMID'];?>'><?php echo $row['PaymethodName'];?></option>" +
-            <?php 
-                                $count += 1;
-                            }//foreach
-                        ?> "</select>" +
-            "</div>" +
-            "<div class='col-md-4'>" +
-            "<label for='paid-input' class='form-label'>Paid</label>" +
-            "<input type='text' class='form-control' name='paid[]' id='paid-input' placeholder='0.00'>" +
-            "</div>" +
-            "<div class='col-md-4'>" +
-            "<a href='javascript:void(0);' class='remove-payment btn btn-danger mt-4' id='remove-payment' onclick='remove_payment(this)' ><i class='ti ti-trash'></i></a>" +
-            "</div>" +
-            "<div>";
-
-        $("#payment_method").append(payment);
-    }
+    <script src="../Assets/jquery/grn_detail.js?v=20261001"></script>
 
 
-    function remove_payment(item) {
-        var value = $(item).attr("id");
-        $(item).parent().parent().remove();
-
-    }
-    //Added by Imila on 2024-09-27
-    function validateForm() {
-        var netamount = parseFloat($("#sub_purchase_price").val());
-        var paid = 0;
-        $("body #paid-input").each(function() {
-            if ($(this).val() == 0 && $(this).val() == "0" || $(this).val() == "") {
-                paid = paid + 0;
-                console.log("No value" + paid);
-            } else {
-                paid = paid + parseFloat($(this).val());
-                console.log("value" + paid);
-            }
-        });
-        if (paid == 0) {
-
-        } else if (paid == "") {
-            alert('Paid Amount Cannot be Empty');
-            $("#paid-input").focus();
-            return false;
-        }
-        // if(netamount > paid)
-        // {
-        //     if($("#customer_id").val()==1)
-        //     {
-        //         alert('Default Customer Cannot Have Credit');
-        //         $("#add-customer").focus();
-        //         return false;
-        //     }
-        // }
-
-        return true;
-    }
-
-    
-   
-    </script>
 
     <script src="../Assets/libs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <?php
@@ -1244,7 +703,7 @@ else
         $scan_upload = ['context' => 'grn', 'doc_id' => $grn_header_id, 'title' => $grn_no, 'apply_label' => 'Add to GRN'];
         include '../View/modals/scan-upload.php';
         ?>
-    <script src="../Assets/jquery/scan_upload.js?v=20260922"></script>
+    <script src="../Assets/jquery/scan_upload.js?v=20261001"></script>
         <?php
     }//scanner upload
     ?>
