@@ -173,7 +173,8 @@ function bcChk($name, $label, $checked, $extra_class = '')
     }
 </style>
 
-<div class="modal fade" tabindex="-1" role="dialog" id="product_barcode_modal" aria-hidden="true">
+<div class="modal fade" tabindex="-1" role="dialog" id="product_barcode_modal" aria-hidden="true"
+     data-max-labels="<?php echo (int) bcMaxLabelsPerJob(); ?>">
     <!-- full screen on a phone: a scrolled-inside-a-scroll dialog is unusable
          on a small screen, and every control here has to stay reachable -->
     <div class="modal-dialog modal-xl modal-fullscreen-sm-down modal-dialog-scrollable" role="document">
@@ -562,12 +563,19 @@ function bcChk($name, $label, $checked, $extra_class = '')
                             Each label gets its own code, kept on record, so no unit can ever be received twice.
                             Untick it to print the plain product barcode, for a shelf label.
                         </div>
-                        <div class="d-flex align-items-center gap-2 mt-2" id="bc_unit_date_row">
+                        <div class="bc-optional mt-2" id="bc_unit_date_row">
                             <label class="form-label mb-0 text-muted fs-2" for="bc_produced_date">Made on</label>
                             <input type="date" class="form-control form-control-sm" style="max-width:190px;"
                                    id="bc_produced_date" name="produced_date"
                                    value="<?php echo date('Y-m-d'); ?>" max="<?php echo date('Y-m-d'); ?>">
                             <span class="text-muted fs-2">the production date the codes carry</span>
+                        </div>
+                        <div class="bc-optional mt-2" id="bc_unit_copies_row">
+                            <label class="form-label mb-0 text-muted fs-2" for="bc_unit_copies">Copies of each unit</label>
+                            <input type="number" class="form-control form-control-sm" style="max-width:90px;"
+                                   id="bc_unit_copies" name="unit_copies" min="1" max="100"
+                                   value="<?php echo (int) $bc_default['unit_copies']; ?>">
+                            <span class="text-muted fs-2">one for the product, one for the invoice, one for the warranty card</span>
                         </div>
                     </div>
                     <?php }//unit barcodes are on ?>
@@ -587,6 +595,7 @@ function bcChk($name, $label, $checked, $extra_class = '')
                     </div>
 
                     <div class="alert alert-warning mt-3 mb-0 py-2 fs-2" id="bc_size_warning" style="display:none;"></div>
+                    <div class="alert alert-danger mt-3 mb-0 py-2 fs-2" id="bc_ceiling_warning" style="display:none;"></div>
                 </div>
 
                 <div class="modal-footer justify-content-between">
@@ -618,7 +627,7 @@ function bcChk($name, $label, $checked, $extra_class = '')
     /* Safety net: if the browser served a barcode-label.js from before this
        dialog existed, say so instead of showing a dead dialog. */
     $(function () {
-        if (window.BC_LABEL_JS !== 4) {
+        if (window.BC_LABEL_JS !== 5) {
             $("#bc_loading").hide();
             $("#bc_stale_warning").show();
         }

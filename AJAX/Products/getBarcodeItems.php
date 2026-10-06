@@ -15,6 +15,8 @@
 require_once __DIR__ . '/../../Includes/barcode_ajax.php';
 require_once __DIR__ . '/../../Includes/barcode_helper.php';
 require_once __DIR__ . '/../../Model/barcode_settings_class.php';
+require_once __DIR__ . '/../../Model/unit_barcode_refused_class.php';
+require_once __DIR__ . '/../../Model/product_unit_class.php';
 
 list($shop_id, $user_id) = bcRequireSession();
 
@@ -44,6 +46,10 @@ try {
 
     $stat = bcShopStat($dbObj, $shop_id);
 
+    //where the shop numbers every unit, the sticker carries the item barcode plus this many more
+    //characters, so the "long code" warning has to measure that and not the item barcode alone
+    $unit_suffix = (new ProductUnits())->suffixLength($shop_id);
+
     $products = bcGetPrintableProducts(
         $dbObj,
         $product_ids,
@@ -70,6 +76,7 @@ try {
             'price'     => number_format($default_price, 2, '.', ''),
             'prices'    => $prices,
             'modules'   => bcBarcodeModuleCount($barcode),
+            'unit_modules' => ($unit_suffix > 0 && $barcode !== '') ? bcBarcodeModuleCount($barcode . str_repeat('9', $unit_suffix)) : 0,
             'printable' => ($barcode !== ''),
         );
     }//foreach product

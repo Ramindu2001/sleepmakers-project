@@ -10,7 +10,7 @@
  * copy reports it instead of opening an empty dialog. Bump it whenever the
  * dialog changes shape.
  */
-window.BC_LABEL_JS = 4;
+window.BC_LABEL_JS = 5;
 
 (function () {
 
@@ -68,7 +68,8 @@ window.BC_LABEL_JS = 4;
         { name: "line_gap",    type: "value",  id: "#bc_line_gap" },
         { name: "letter_sp",   type: "value",  id: "#bc_letter_sp" },
         { name: "bar_color",   type: "value",  id: "#bc_bar_color" },
-        { name: "copies",      type: "value",  id: "#bc_copies" }
+        { name: "copies",      type: "value",  id: "#bc_copies" },
+        { name: "unit_copies", type: "value",  id: "#bc_unit_copies" }
     ];
 
     //what the dialog looks like with nothing loaded - captured on first open
@@ -471,10 +472,14 @@ window.BC_LABEL_JS = 4;
 
     function refreshTotals() {
         var products = 0;
+        var units = 0;
         var labels = 0;
         var maxModules = 0;
 
-        var copies = parseInt($("#bc_copies").val(), 10);
+        var unitOn = $("#bc_unit_mode").is(":checked");
+
+        //a unit job repeats each unit's sticker by its own copies, a plain job by the style option
+        var copies = parseInt($(unitOn ? "#bc_unit_copies" : "#bc_copies").val(), 10);
         if (!(copies > 0)) {
             copies = 1;
         }//being retyped - count as one, but leave the box alone
@@ -486,9 +491,11 @@ window.BC_LABEL_JS = 4;
             }
 
             products++;
+            units += readQty(qtyField);
             labels += readQty(qtyField) * copies;
 
-            var modules = parseFloat($(this).data("bc-modules"));
+            //a unit's code is longer than the product's, so the sticker warning measures that one
+            var modules = parseFloat($(this).data(unitOn && $(this).data("bc-unit-modules") ? "bc-unit-modules" : "bc-modules"));
             if (modules > maxModules) {
                 maxModules = modules;
             }
@@ -498,10 +505,21 @@ window.BC_LABEL_JS = 4;
         //whatever charset the server serves the script with
         $("#bc_total_summary").text(
             products + " product" + (products === 1 ? "" : "s") + " \u2022 " +
+            (unitOn ? units + " unit" + (units === 1 ? "" : "s") + " x " + copies + " cop" + (copies === 1 ? "y" : "ies") + " = " : "") +
             labels + " label" + (labels === 1 ? "" : "s")
         );
 
-        $("#bc_btn_print").prop("disabled", products === 0);
+        //one page holds a fixed number of stickers and a unit job over it is refused, so say so here
+        var ceiling = parseInt($("#product_barcode_modal").attr("data-max-labels"), 10) || 0;
+        var tooMany = unitOn && ceiling > 0 && labels > ceiling;
+
+        $("#bc_ceiling_warning")
+            .text("That is " + labels + " stickers and one job holds at most " + ceiling + ". At " + copies +
+                " cop" + (copies === 1 ? "y" : "ies") + " print up to " + Math.floor(ceiling / copies) +
+                " units at a time, or lower the copies.")
+            .toggle(tooMany);
+
+        $("#bc_btn_print").prop("disabled", products === 0 || tooMany);
 
         //warn when a long code is squeezed onto a small sticker
         var warning = $("#bc_size_warning");
@@ -568,7 +586,8 @@ window.BC_LABEL_JS = 4;
                 //store the module count for the sticker size warning
                 for (var j = 0; j < res.items.length; j++) {
                     $("#bc_items_body tr[data-bc-id='" + res.items[j].id + "']")
-                        .data("bc-modules", res.items[j].modules);
+                        .data("bc-modules", res.items[j].modules)
+                        .data("bc-unit-modules", res.items[j].unit_modules || 0);
                 }
 
                 $("#bc_loading").hide();
@@ -633,7 +652,7 @@ window.BC_LABEL_JS = 4;
 
         /* input: recalculate the total, but NEVER rewrite what is being typed -
            that is what made the Labels box impossible to clear. */
-        $("#product_barcode_modal").on("input", ".bc-qty, #bc_copies", refreshTotals);
+        $("#product_barcode_modal").on("input", ".bc-qty, #bc_copies, #bc_unit_copies", refreshTotals);
 
         /* blur: now that the operator has finished, put a usable number back */
         $("#product_barcode_modal").on("blur", ".bc-qty", function () {
@@ -641,10 +660,10 @@ window.BC_LABEL_JS = 4;
             refreshTotals();
         });
 
-        $("#product_barcode_modal").on("blur", "#bc_copies", function () {
+        $("#product_barcode_modal").on("blur", "#bc_copies, #bc_unit_copies", function () {
             var copies = parseInt($(this).val(), 10);
             if (!(copies > 0)) {
-                copies = 1;
+                copies = $(this).is("#bc_unit_copies") ? 3 : 1;
             }
             if (copies > 100) {
                 copies = 100;
@@ -716,8 +735,11 @@ window.BC_LABEL_JS = 4;
            Labels column then counts units to number rather than copies to print. */
         function unitMode() {
             var on = $("#bc_unit_mode").is(":checked");
-            $("#bc_unit_date_row").toggle(on);
+            //bc-optional / bc-hidden, not .toggle(): these rows used d-flex, whose !important display a plain hide cannot beat
+            $("#bc_unit_date_row").toggleClass("bc-hidden", !on);
+            $("#bc_unit_copies_row").toggleClass("bc-hidden", !on);
             $(".bc-qty-head").text(on ? "Units" : "Labels");
+            refreshTotals();
             return on;
         }
 
