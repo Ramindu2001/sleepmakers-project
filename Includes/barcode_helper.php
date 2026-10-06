@@ -476,6 +476,7 @@ if (!function_exists('bcGetLabelSizes')) {
 
             //-------------------------------------------------------------- job
             'copies'      => 1,
+            'unit_copies' => 3,      //stickers of each unit: on the product, the invoice, the warranty card
             'auto_print'  => 1,
         );
     }//bcOptionDefaults
@@ -507,6 +508,7 @@ if (!function_exists('bcGetLabelSizes')) {
         $out['name_len']  = bcClampInt($out['name_len'], 0, 120, 0);
         $out['price_dec'] = bcClampInt($out['price_dec'], 0, 3, 2);
         $out['copies']    = bcClampInt($out['copies'], 1, 100, 1);
+        $out['unit_copies'] = bcClampInt($out['unit_copies'], 1, 100, 3);
         $out['bar_scale'] = bcClampInt($out['bar_scale'], 40, 100, 100);
 
         //--------------------------------------------------------- typography
@@ -1037,5 +1039,109 @@ if (!function_exists('bcGetLabelSizes')) {
     {
         return rtrim(rtrim(number_format((float) $mm, 2, '.', ''), '0'), '.');
     }//bcMm
+
+    /**
+     * The copies of each unit asked for in a raw option set (a posted job, a saved shop default),
+     * read the way bcResolveOptions() will read it: 1 to 100, three when there is none.
+     */
+    function bcUnitCopiesOf($options)
+    {
+        return bcClampInt(is_array($options) && isset($options['unit_copies']) ? $options['unit_copies'] : 3, 1, 100, 3);
+    }//bcUnitCopiesOf
+
+    /**
+     * Would a unit job fit on one page? Every unit is numbered before the page renders, and a page
+     * renders at most $max stickers, so a job that is too big has to be refused BEFORE it numbers
+     * anything. Returns '' when it fits, else the reason, in words the operator can act on.
+     */
+    function bcUnitJobCeiling($units, $copies, $max)
+    {
+        $units  = max(0, (int) $units);
+        $copies = max(1, (int) $copies);
+        $max    = max(1, (int) $max);
+        $total  = $units * $copies;
+
+        if ($total <= $max) {
+            return '';
+        }//fits
+
+        $word = ($copies === 1) ? 'copy' : 'copies';
+
+        return 'That would print ' . number_format($total) . ' stickers (' . number_format($units)
+            . ' units x ' . $copies . ' ' . $word . ') and one job holds at most ' . number_format($max)
+            . '. At ' . $copies . ' ' . $word . ' print up to ' . number_format((int) floor($max / $copies))
+            . ' units at a time, or lower the copies.';
+    }//bcUnitJobCeiling
+
+    /**
+     * The height, in millimetres, of the lines of a UNIT sticker with the bars at $bars mm: every
+     * line that is switched on, the code as TWO lines (the item barcode above the bars, the date and
+     * serial below them) and the gap between neighbours. Text is set at the line height 1.05 that
+     * print-barcode.php uses.
+     */
+    function bcUnitContentHeight($options, $bars)
+    {
+        $line  = 1.05;
+        $parts = array();
+
+        if (!empty($options['show_shop'])) {
+            $parts[] = $options['shop_font'] * $line;
+        }//shop line
+        if (!empty($options['show_name'])) {
+            $parts[] = $options['name_font'] * $line;
+        }//item name
+        if (!empty($options['show_second'])) {
+            $parts[] = $options['name_font'] * $line;
+        }//second name
+        foreach (array('show_cat', 'show_sku') as $flag) {
+            if (!empty($options[$flag])) {
+                $parts[] = $options['small_font'] * $line;
+            }
+        }//small lines above the code
+        if (!empty($options['show_code'])) {
+            $parts[] = $options['code_font'] * $line;
+        }//the item barcode, above the bars
+        if (!empty($options['show_bars'])) {
+            $parts[] = (float) $bars;
+        }//the bars
+        if (!empty($options['show_code'])) {
+            $parts[] = $options['code_font'] * $line;
+        }//the date and serial, below the bars
+        if (!empty($options['show_price'])) {
+            $parts[] = $options['price_font'] * $line;
+        }//price
+        foreach (array('show_batch', 'show_date', 'show_footer') as $flag) {
+            if (!empty($options[$flag])) {
+                $parts[] = $options['small_font'] * $line;
+            }
+        }//small lines after it
+
+        if (empty($parts)) {
+            return 0.0;
+        }//nothing on the sticker
+
+        return array_sum($parts) + (count($parts) - 1) * (float) $options['line_gap'];
+    }//bcUnitContentHeight
+
+    /**
+     * The bar height of a UNIT sticker. Its code takes two lines where a plain label has one, so
+     * where a small sticker has no room for the second line the bars give back the difference
+     * (never going below 3mm). A bar height the operator typed in is respected
+     * ($bars_are_automatic false), and so is a sticker with no bars or no number.
+     */
+    function bcUnitBarHeight($options, $size, $bars_are_automatic = true)
+    {
+        $bars = (float) $options['bar_height'];
+
+        if (!$bars_are_automatic || empty($options['show_bars']) || empty($options['show_code'])) {
+            return $bars;
+        }//nothing to give back
+
+        $inner = (float) $size['height'] - 2 * (float) $options['padding'];
+        $room  = $inner - bcUnitContentHeight($options, 0);
+        $fits  = floor(round($room, 6) * 10) / 10;
+
+        return ($fits >= $bars) ? $bars : max(3.0, $fits);
+    }//bcUnitBarHeight
 
 }//function guard
