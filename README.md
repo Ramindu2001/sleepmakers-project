@@ -136,6 +136,7 @@ C:/xampp/php/php.exe tests/e2e/shop_permissions_e2e.php [base-url]
 C:/xampp/php/php.exe tests/e2e/unit_barcodes_e2e.php [base-url]
 node tests/ui/scan_upload_ui.mjs [screenshot-folder]         # headless Chrome (Node 24+), the scanner dialog
 node tests/ui/customer_orders_ui.mjs [screenshot-folder]     # headless Chrome, the customer order pages
+node tests/ui/unit_label_ui.mjs [screenshot-folder]          # headless Chrome, the Print Barcode dialog and unit stickers
 ```
 
 ## Development Notes

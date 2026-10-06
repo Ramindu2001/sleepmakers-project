@@ -3,6 +3,8 @@
 - **Date:** 2026-09-23
 - **Branch:** `main`
 - **Status:** Approved by the customer (three format/scope choices confirmed before implementation)
+- **Superseded in part:** the numbering rule in section 3 (the serial restarts per item per month) is
+  replaced by `2026-10-06-daily-unit-numbering-design.md`: one running serial per company and day.
 
 ## 1. Problem
 

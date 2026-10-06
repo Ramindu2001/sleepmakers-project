@@ -25,7 +25,7 @@ differently anywhere. `db/unit_barcodes.sql` is the same schema as plain SQL.
 |---|---|
 | `productunits` | one row per printed unit; `UnitBarcode` is **unique**, which is what makes registering a unit twice impossible |
 | `barcodesettings.UnitMode` | `1` = this shop prints a unique barcode on every unit |
-| `barcodesettings.UnitPattern` | how a unit code is built, default `{ITEM}{YY}{MM}{SEQ}` |
+| `barcodesettings.UnitPattern` | how a unit code is built, default `{ITEM}{YY}{MM}{DD}{SEQ}` |
 | `barcodesettings.UnitSeqLength` | digits in the serial, default `4` |
 | `barcodesettings.UnitSeparator` | between the parts, default none |
 
@@ -34,11 +34,11 @@ differently anywhere. `db/unit_barcodes.sql` is the same schema as plain SQL.
 ## 2. The code
 
 ```
-COO00001 2509 0013      ->  COO0000125090013
-   |      |    |
-   |      |    +-- serial, restarts per item per month
-   |      +------- year and month it was made
-   +-------------- the product's own barcode
+COO00001 250912 0013    ->  COO000012509120013
+   |       |      |
+   |       |      +-- serial: one running number for the day, whatever the product
+   |       +--------- year, month and day it was made
+   +----------------- the product's own barcode - the prefix (the rest is the suffix)
 ```
 
 | Token | Value |
@@ -48,8 +48,14 @@ COO00001 2509 0013      ->  COO0000125090013
 | `{SEQ}` | the serial - **required**, padded to *Serial digits* |
 
 The serial comes from the barcode module's atomic counter, under the key
-`unit:<everything in the code except the serial>`. So it restarts whenever that fixed part
-changes: with `{YY}{MM}` in the pattern, each item starts again at 1 every month.
+`unit:c<company id>:<the date part of the code>` (for example `unit:c2:261006`), held under shop
+id 0 because the series belongs to the company. The item is **not** part of the key: every product
+made on the same day shares one running serial, so the first unit of the day is `0001` whatever it
+is, the next is `0002`, and the next day starts at `0001` again. With `{YY}{MM}` only in the pattern
+the series is the month's. A series that has no counter yet starts after the highest serial already
+issued in it (any item, any shop of the company, any state), so a day that was numbered item by item
+before this rule cannot repeat a code. When the serial's digits run out (9,999 at 4 digits) the print
+is refused, with the number given back; raise *Serial digits*.
 
 **The exact production day is always stored on the row**, whatever the code carries. A code
 with only the month still answers "how many did we make on the 12th".
@@ -73,13 +79,22 @@ already printed never change - only new ones follow the new rule.
 - The server numbers that many units **in one transaction** and prints one sticker per code.
 - Numbering happens once per job; reloading the label page re-renders the same codes.
 - Untick the box for a plain product label (a shelf label, say).
-- The 1000-label ceiling of the barcode module still applies.
+- **Copies of each unit** (default 3, 1 to 100): one sticker for the product, one for the invoice,
+  one for the warranty card. The total is units x copies.
+- A sticker shows the item barcode **above** the bars and the date and serial **below** them; the
+  bars encode the whole code. Plain product labels are unchanged.
+- One job holds at most 1,000 stickers (units x copies). A bigger job is refused **before** any
+  unit is numbered, with the number of units that would fit; the dialog shows the total live and
+  disables *Print Labels* over it.
 
 ### Reprinting
 
 *Items → Unit Barcodes → Reprint* puts the codes of an earlier job on paper again. It
 **allocates nothing**: the same codes come out, and `PrintCount` records that it happened. That
 is how a damaged sticker is replaced without inventing a second unit.
+
+Each job has a copies box beside *Reprint* (the shop's saved default, three if none). A reprint
+that would exceed one page of stickers is refused with the same message as a new job.
 
 ---
 
@@ -113,6 +128,8 @@ Refused lines can be left out like any other, so one bad sticker never blocks a 
   product it belongs to, so the sticker on the box scans at the counter.
 - **Transfers.** Picking and checking by scanning unit stickers works on both sides; each unit
   counts one for its product.
+- **The product page.** Type or scan a unit's whole barcode into the search box and the product it
+  belongs to is found, in any case. Typing a product barcode or part of a name works as before.
 - Nothing is recorded against a unit in either place - a unit is tracked as **printed** and
   **received**, which is what was asked for. Marking sold or transferred would be new writes
   on top of what is here, not a change to it.
@@ -165,13 +182,18 @@ Model/scan_document_class.php     folds unit codes into their item (transfers)
 Model/scan_grn_class.php          unit lines, duplicates, per-production-date lines
 Model/scan_transfer_class.php     unit codes on both sides of a transfer
 Model/barcode_settings_class.php  saveUnitSettings()
-Public/print-barcode.php          a job can carry one code per unit, and reprints
+Public/print-barcode.php          a job can carry one code per unit, reprints, the two-line code, copies, the ceiling check
 Public/barcode-settings.php       the unit rules
-View/modals/product_barcode.php   the unit mode and the production date
+View/modals/product_barcode.php   the unit mode, the production date, the copies of each unit
 View/sidebar.php                  Items > Unit Barcodes
-Assets/jquery/barcode-label.js    the mode toggle
+Assets/jquery/barcode-label.js    the mode toggle, the live sticker total and its ceiling
 AJAX/guiPos/getbarcodevalue.php   the till resolves a unit code
 Controller/barcodeSettingsController.php  saves the unit rules
+Includes/barcode_helper.php       the copies of a unit, the one-page ceiling, the bars of a two-line code
+AJAX/Products/getProductSearch.php   finds a product from a unit's whole barcode
+AJAX/Products/getBarcodeItems.php    the length of a unit code, for the dialog's size warning
+Public/product.php                shows why a print was refused
+Public/unit-barcodes.php          the copies box beside Reprint
 ```
 
 ---
@@ -188,3 +210,10 @@ production count; `UnitBarcodesMigrationTest` the install; `ScanParserTest` the 
 tokens; `GrnScanUnitsTest` the GRN rules above. The end-to-end script numbers three units,
 prints them, scans them into a GRN, scans them again and is refused, reprints, and sells one
 at the till.
+
+`UnitLabelTest` covers the copies of a unit, the one-page ceiling and the bars of a two-line code;
+`ProductUnitsTest` also covers the shared daily serial, seeding, capacity and the prefix/suffix split.
+The end-to-end script also searches the product page by a unit code, checks the two-line label, the
+three copies and the refusal message. The browser check is
+`BASE=<site> node tests/ui/unit_label_ui.mjs [screenshot-folder]`: the dialog, and every sticker size
+for clipping.
