@@ -384,4 +384,50 @@ final class ProductUnitsTest extends DatabaseTestCase
 
         $this->assertSame(7, $this->units->countProduced($this->warehouse, '2025-09-12'));
     }
+
+    // ---- the two halves of a code, and finding a product from a sticker ----------------
+
+    public function test_a_code_splits_into_the_item_and_the_rest()
+    {
+        $this->assertSame(['MATCOO00005', '2610010006'], ProductUnits::splitCode('MATCOO000052610010006', 'MATCOO00005'));
+        //an item barcode that is long and ends in digits splits by the item, never by a width
+        $this->assertSame(['MATCOO26092300001', '2610060001'],
+            ProductUnits::splitCode('MATCOO260923000012610060001', 'MATCOO26092300001'));
+    }
+
+    public function test_the_separator_that_joined_the_parts_is_dropped()
+    {
+        $this->assertSame(['COO00001', '25-09-12-001'], ProductUnits::splitCode('COO00001-25-09-12-001', 'COO00001'));
+        $this->assertSame(['COO00001', '250912_0001'], ProductUnits::splitCode('COO00001_250912_0001', 'COO00001'));
+    }
+
+    public function test_a_code_that_does_not_start_with_its_item_is_not_split()
+    {
+        $this->assertNull(ProductUnits::splitCode('2509COO000010001', 'COO00001'));
+        $this->assertNull(ProductUnits::splitCode('COO00001', 'COO00001'), 'nothing after the item');
+        $this->assertNull(ProductUnits::splitCode('COO000012509120001', ''), 'no item to split on');
+    }
+
+    public function test_the_item_is_matched_without_regard_to_case_but_printed_as_the_code_has_it()
+    {
+        $this->assertSame(['coo00001', '2509120001'], ProductUnits::splitCode('coo000012509120001', 'COO00001'));
+    }
+
+    public function test_a_typed_unit_code_names_the_item_it_was_printed_for()
+    {
+        $code = $this->print($this->bed, '2025-09-12', 1)['codes'][0];
+
+        $this->assertSame('COO00001', $this->units->itemBarcodeFor($code, $this->warehouse));
+        $this->assertSame('COO00001', $this->units->itemBarcodeFor('  ' . strtolower($code) . ' ', $this->warehouse));
+    }
+
+    public function test_text_that_is_not_a_printed_unit_code_names_no_item()
+    {
+        $this->print($this->bed, '2025-09-12', 1);
+
+        $this->assertSame('', $this->units->itemBarcodeFor('COO00001', $this->warehouse), 'a product barcode is not a unit code');
+        $this->assertSame('', $this->units->itemBarcodeFor('COO000012509129999', $this->warehouse));
+        $this->assertSame('', $this->units->itemBarcodeFor('   ', $this->warehouse));
+        $this->assertSame('', $this->units->itemBarcodeFor("x' OR '1'='1", $this->warehouse));
+    }
 }

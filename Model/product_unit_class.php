@@ -488,6 +488,42 @@ class ProductUnits extends Dbh
         return (int)$stmt->fetchColumn();
     }//count produced
 
+    //The two halves of a unit code as its sticker prints them: the item barcode (the prefix) and the
+    //rest (the date and the serial, without the separator that joined them). Null when the code does
+    //not start with its item, so the caller prints it whole. Goes by the item, never by a width: an
+    //item barcode can be long and can end in digits.
+    public static function splitCode($unit_code, $item_barcode)
+    {
+        $unit_code = (string)$unit_code;
+        $item = trim((string)$item_barcode);
+        if($item === '' || strlen($unit_code) <= strlen($item) || strncasecmp($unit_code, $item, strlen($item)) !== 0)
+        {
+            return null;
+        }
+
+        $rest = preg_replace('/^[^A-Za-z0-9]+/', '', substr($unit_code, strlen($item)));
+        return $rest === '' ? null : [substr($unit_code, 0, strlen($item)), $rest];
+    }//split code
+
+    //The product barcode a typed or scanned unit code belongs to, or '' when the text is not a unit
+    //code we printed. The product page's search uses it to find a product from its sticker.
+    public function itemBarcodeFor($text, $shop_id)
+    {
+        $text = trim((string)$text);
+        if($text === '')
+        {
+            return '';
+        }
+
+        $found = $this->resolve([$text], $shop_id);
+        if(empty($found))
+        {
+            return '';
+        }
+        $unit = reset($found);
+        return trim((string)$unit['ItemBarcode']);
+    }//item barcode for
+
     //------------------------------------------------------------------ helpers
 
     //the product, when it belongs to this shop (or to its company, where the catalog is shared)
