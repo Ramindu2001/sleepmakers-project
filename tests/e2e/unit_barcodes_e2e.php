@@ -87,6 +87,12 @@ try {
     check('looking one up shows its item and the day it was made', $b->has('e2e Bed')
         && $b->has('2025-09-12') && $b->has('Printed, not received yet'), $b);
     checkClean('the unit barcodes page', $b);
+    check('each print job offers its copies beside Reprint, three by default',
+        $b->has('name="unit_copies" min="1" max="100" value="3"'), $b);
+    $b->get('Public/barcode-settings.php');
+    check('the unit rules say the serial is shared by every product made on the date',
+        $b->has('shared by every product made on the same'), $b);
+    checkClean('the barcode settings page', $b);
 
     echo "Finding the product from a unit's sticker\n";
     $b->get('AJAX/Products/getProductSearch.php?txt_input=' . urlencode($codes[0]));
@@ -156,11 +162,25 @@ try {
         'item_price' => ['1500.00'], 'item_batch' => [''], 'unit_copies' => 3, 'bc_size' => '50x25']);
     check('400 units at 3 copies (1,200 stickers) is refused before anything is numbered',
         (int) $pdo->query("SELECT COUNT(*) FROM productunits WHERE shop_SHID = $W")->fetchColumn() === $numbered, $b);
+    check('and the product page says why', $b->isOn('product.php') && $b->has('1,200 stickers (400 units x 3 copies)'), $b);
+    $b->get('Public/product.php');
+    check('the reason is shown once, not on the next visit', !$b->has('1,200 stickers'), $b);
 
     echo "Reprinting with a number of copies\n";
     $b->post('Public/print-barcode.php', ['btn_print_barcode' => '1', 'print_mode' => 'reprint', 'print_ref' => $ref,
         'unit_copies' => 2]);
     check('two copies of three units is six stickers', substr_count($b->body, '<div class="bc-label">') === 6, $b);
+
+    echo "The shop's own default for the copies\n";
+    $b->post('AJAX/Barcode/saveLabelDefaults.php', ['options' => json_encode(['size' => '50x25', 'unit_copies' => 5])]);
+    check('Save as shop default keeps the copies of a unit', $b->json('ok') === true, $b);
+    $b->get('Public/unit-barcodes.php');
+    check('and a reprint starts on them', $b->has('name="unit_copies" min="1" max="100" value="5"'), $b);
+    $b->post('AJAX/Products/getBarcodeItems.php', ['product_ids' => [$stock->products['bed']]]);
+    $dialog = json_decode($b->body, true);
+    check('as does the dialog', isset($dialog['defaults']['unit_copies']) && (int) $dialog['defaults']['unit_copies'] === 5, $b);
+    check('which also reports how long a unit code is, for the sticker warning',
+        isset($dialog['items'][0]['unit_modules']) && $dialog['items'][0]['unit_modules'] > $dialog['items'][0]['modules'], $b);
 
     echo "Selling a unit at the till\n";
     $b->get('AJAX/guiPos/getbarcodevalue.php?barcodevalue=' . $codes[0]);

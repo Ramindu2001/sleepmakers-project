@@ -12,8 +12,13 @@ include '../Includes/includes.php';
 include '../Includes/authcheck.php';
 require_once '../Model/unit_barcode_refused_class.php';
 require_once '../Model/product_unit_class.php';
+require_once '../Includes/barcode_helper.php';
 
 $unitObj = new ProductUnits();
+
+//the copies of each unit a reprint starts on: the shop's saved label default, else three
+$stored = (new BarcodeSettings())->getSettings($shop_id);
+$reprintCopies = bcUnitCopiesOf(bcShopLabelDefaults(isset($stored['LabelDefaults']) ? $stored['LabelDefaults'] : ''));
 
 //the dates being looked at: this month unless the form says otherwise
 $from = ProductUnits::validDate(isset($_GET['from']) ? $_GET['from'] : '');
@@ -222,6 +227,9 @@ function ubE($value)
                                                                 <form action="print-barcode.php" method="POST" target="_blank" class="d-inline">
                                                                     <input type="hidden" name="print_mode" value="reprint">
                                                                     <input type="hidden" name="print_ref" value="<?= ubE($job['print_ref']) ?>">
+                                                                    <input type="number" name="unit_copies" min="1" max="100" value="<?= (int) $reprintCopies ?>"
+                                                                           class="form-control form-control-sm d-inline-block align-middle me-1"
+                                                                           style="width:68px;" title="Copies of each unit">
                                                                     <button type="submit" name="btn_print_barcode" value="1"
                                                                             class="btn btn-sm btn-light border" title="Print these same codes again">
                                                                         <i class="ti ti-printer"></i> Reprint

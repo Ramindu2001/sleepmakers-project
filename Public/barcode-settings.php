@@ -615,6 +615,9 @@ function bcsE($value)
                                         <span class="text-muted fs-2">
                                             {ITEM} the product's barcode, {YY} {MM} {DD} {YYYY} the production date,
                                             {SEQ} the serial. {ITEM} and {SEQ} are required.
+                                            The serial is one running number shared by every product made on the same
+                                            date, across the whole company: {ITEM}{YY}{MM}{DD}{SEQ} counts 0001, 0002,
+                                            0003 ... through the day, whatever was made.
                                         </span>
                                     </div>
                                     <div class="col-6 col-md-3">
