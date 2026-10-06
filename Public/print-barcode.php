@@ -144,6 +144,15 @@ if (isset($_POST['btn_print_barcode'])) {
                     $job['options'] = bcShopLabelDefaults(isset($stored['LabelDefaults']) ? $stored['LabelDefaults'] : '');
                 }//the shop's own label settings
 
+                if (isset($_POST['unit_copies'])) {
+                    $job['options']['unit_copies'] = $_POST['unit_copies'];
+                }//the copies asked for beside the Reprint button
+
+                $too_many = bcUnitJobCeiling(count($again), bcUnitCopiesOf($job['options']), bcMaxLabelsPerJob());
+                if ($too_many !== '') {
+                    throw new UnitBarcodeRefused(422, $too_many);
+                }//would not all print: refused before the reprint is counted
+
                 $unitObj->reprint($shop_id, $ref);
                 $job['print_ref'] = $ref;
             }//again, the same codes
@@ -157,6 +166,16 @@ if (isset($_POST['btn_print_barcode'])) {
                 foreach ($job['items'] as $item) {
                     $wanted[$item['id']] = $item['qty'];
                 }//how many of each
+
+                /*
+                 * Every unit is numbered before the page renders, and a page renders at most one
+                 * job's worth of stickers. Say no BEFORE numbering anything, or units would be
+                 * recorded as printed that never reach the paper.
+                 */
+                $too_many = bcUnitJobCeiling(array_sum($wanted), bcUnitCopiesOf($job['options']), bcMaxLabelsPerJob());
+                if ($too_many !== '') {
+                    throw new UnitBarcodeRefused(422, $too_many);
+                }//would not all print
 
                 $batch = $unitObj->allocateBatch($shop_id, $wanted, $produced, $user_id);
                 foreach ($job['items'] as $index => $item) {
@@ -216,8 +235,20 @@ if ($unit_ref !== '') {
     require_once __DIR__ . '/../Model/product_unit_class.php';
 
     foreach ((new ProductUnits())->forPrintRef($shop_id, $unit_ref) as $unit) {
-        $unit_codes[(int) $unit['products_PDID']][] = (string) $unit['UnitBarcode'];
+        $unit_codes[(int) $unit['products_PDID']][] = array(
+            'code'  => (string) $unit['UnitBarcode'],
+            //the item barcode above the bars and the rest below them; null prints the code whole
+            'split' => ProductUnits::splitCode($unit['UnitBarcode'], $unit['ItemBarcode']),
+        );
     }//each unit of the job
+
+    //a unit's code takes two lines, one above the bars and one below: where a small sticker has no
+    //room for the second line the bars give back the difference
+    $options['bar_height'] = bcUnitBarHeight(
+        $options,
+        $size,
+        empty($raw_options['bar_height']) || (float) $raw_options['bar_height'] <= 0
+    );
 }//unit job
 
 //------------------------------------------------------------- build stickers
@@ -243,11 +274,12 @@ foreach ($job['items'] as $item) {
      * A unit job carries one code per unit; everything else prints the product's
      * own code as many times as was asked for.
      */
-    $codes = isset($unit_codes[$item['id']])
+    $is_unit = !empty($unit_codes[$item['id']]);
+    $codes   = $is_unit
         ? $unit_codes[$item['id']]
-        : array_fill(0, max(1, (int) $item['qty']), $barcode);
+        : array_fill(0, max(1, (int) $item['qty']), array('code' => $barcode, 'split' => null));
 
-    if ($barcode === '' && empty($unit_codes[$item['id']])) {
+    if ($barcode === '' && !$is_unit) {
         $skipped[] = $product['ItemName'];
         continue;
     }//no barcode on the product
@@ -263,9 +295,10 @@ foreach ($job['items'] as $item) {
 
     $category_line = trim($product['CategoryName'] . ' / ' . $product['SubCatName'], ' /');
 
-    foreach ($codes as $code) {
+    foreach ($codes as $entry) {
 
-        $svg = '';
+        $code = $entry['code'];
+        $svg  = '';
 
         if ($options['show_bars']) {
             $cache_key = $code . '|' . $options['symbology'] . '|' . $options['bar_color'];
@@ -288,13 +321,17 @@ foreach ($job['items'] as $item) {
             'category' => $category_line,
             'sku'      => (string) $product['ProductNo'],
             'barcode'  => $code,
+            'prefix'   => $entry['split'] === null ? '' : $entry['split'][0],
+            'suffix'   => $entry['split'] === null ? '' : $entry['split'][1],
             'batch'    => (string) $item['batch'],
             'price'    => $item['price'],
             'svg'      => $svg,
         );
 
-        //copies repeats each sticker; a unit is one sticker unless copies says otherwise
-        for ($i = 0; $i < $options['copies']; $i++) {
+        //every sticker is repeated: a unit by its own copies (the product, the invoice, the
+        //warranty card), a plain label by the copies option
+        $copies = $is_unit ? $options['unit_copies'] : $options['copies'];
+        for ($i = 0; $i < $copies; $i++) {
 
             if (count($stickers) >= $max_labels) {
                 $was_capped = true;
@@ -677,12 +714,16 @@ function bcpE($value)
                                     <div class="bc-small"><?php echo bcpE($sticker['sku']); ?></div>
                                 <?php } ?>
 
+                                <?php if ($options['show_code'] && $sticker['prefix'] !== '') { ?>
+                                    <div class="bc-code bc-code-prefix"><?php echo bcpE($sticker['prefix']); ?></div>
+                                <?php } ?>
+
                                 <?php if ($options['show_bars']) { ?>
                                     <div class="bc-bars"><?php echo $sticker['svg']; ?></div>
                                 <?php } ?>
 
                                 <?php if ($options['show_code']) { ?>
-                                    <div class="bc-code"><?php echo bcpE($sticker['barcode']); ?></div>
+                                    <div class="bc-code"><?php echo bcpE($sticker['prefix'] !== '' ? $sticker['suffix'] : $sticker['barcode']); ?></div>
                                 <?php } ?>
 
                                 <?php if ($options['show_price']) { ?>

@@ -69,8 +69,14 @@ try {
     check('each one has its own code, built from the item, the day and a serial',
         $codes === ['E2EBED012509120001', 'E2EBED012509120002', 'E2EBED012509120003'], $b);
     check('and each carries the day it was made', array_unique(array_column($units, 'ProducedDate')) === ['2025-09-12'], $b);
-    check('the labels show those codes, one sticker each', $b->has('E2EBED012509120001')
-        && $b->has('E2EBED012509120002') && $b->has('E2EBED012509120003'), $b);
+    check('the item barcode is printed above the bars, the date and serial below them',
+        $b->has('<div class="bc-code bc-code-prefix">E2EBED01</div>')
+        && $b->has('<div class="bc-code">2509120001</div>')
+        && $b->has('<div class="bc-code">2509120003</div>')
+        && strpos($b->body, 'class="bc-code bc-code-prefix"') < strpos($b->body, 'class="bc-bars"')
+        && strpos($b->body, 'class="bc-bars"') < strpos($b->body, '<div class="bc-code">2509120001</div>'), $b);
+    check('each unit prints three stickers by default: nine for three units',
+        substr_count($b->body, '<div class="bc-label">') === 9, $b);
     checkClean('the label page', $b);
 
     echo "What was produced\n";
@@ -137,10 +143,24 @@ try {
     $before = count($codes);
     $b->post('Public/print-barcode.php', ['btn_print_barcode' => '1', 'print_mode' => 'reprint', 'print_ref' => $ref]);
     $after = unitsOf($pdo, $W, $ref);
-    check('the same codes come out again', $b->has($codes[0]) && $b->has($codes[2]), $b);
+    check('the same codes come out again',
+        $b->has('<div class="bc-code">' . substr($codes[0], 8) . '</div>') && $b->has('<div class="bc-code">' . substr($codes[2], 8) . '</div>'), $b);
     check('nothing new was numbered', count($after) === $before, $b);
     check('and the reprint is recorded',
         array_unique(array_map('intval', array_column($after, 'PrintCount'))) === [2], $b);
+
+    echo "A job that would not all print\n";
+    $numbered = (int) $pdo->query("SELECT COUNT(*) FROM productunits WHERE shop_SHID = $W")->fetchColumn();
+    $b->post('Public/print-barcode.php', ['btn_print_barcode' => '1', 'print_mode' => 'units',
+        'produced_date' => '2025-09-12', 'item_id' => [$stock->products['bed']], 'item_qty' => [400],
+        'item_price' => ['1500.00'], 'item_batch' => [''], 'unit_copies' => 3, 'bc_size' => '50x25']);
+    check('400 units at 3 copies (1,200 stickers) is refused before anything is numbered',
+        (int) $pdo->query("SELECT COUNT(*) FROM productunits WHERE shop_SHID = $W")->fetchColumn() === $numbered, $b);
+
+    echo "Reprinting with a number of copies\n";
+    $b->post('Public/print-barcode.php', ['btn_print_barcode' => '1', 'print_mode' => 'reprint', 'print_ref' => $ref,
+        'unit_copies' => 2]);
+    check('two copies of three units is six stickers', substr_count($b->body, '<div class="bc-label">') === 6, $b);
 
     echo "Selling a unit at the till\n";
     $b->get('AJAX/guiPos/getbarcodevalue.php?barcodevalue=' . $codes[0]);
