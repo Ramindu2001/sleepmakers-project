@@ -27,7 +27,7 @@ final class UnitBarcodesMigrationTest extends DatabaseTestCase
 
         $settings = $this->columns('barcodesettings');
         $this->assertSame('0', $settings['UnitMode'], 'unit barcodes start switched off');
-        $this->assertSame('{ITEM}{YY}{MM}{SEQ}', $settings['UnitPattern']);
+        $this->assertSame('{ITEM}{YY}{MM}{DD}{SEQ}', $settings['UnitPattern']);
         $this->assertSame('4', $settings['UnitSeqLength']);
         $this->assertStringContainsString('[ok] table productunits', implode("\n", $report));
     }

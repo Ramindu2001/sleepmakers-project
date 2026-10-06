@@ -145,8 +145,8 @@ final class GrnScanUnitsTest extends DatabaseTestCase
 
     public function test_a_unit_code_we_never_printed_is_refused()
     {
-        $preview = $this->scan->preview($this->grn, $this->shop, $this->alice, 'COO0000125099999');
-        $line = $this->lines($preview)['COO0000125099999'];
+        $preview = $this->scan->preview($this->grn, $this->shop, $this->alice, 'COO000012509129999');
+        $line = $this->lines($preview)['COO000012509129999'];
 
         $this->assertSame('error', $line['status']);
         $this->assertStringContainsString('not a unit', strtolower($line['message']));

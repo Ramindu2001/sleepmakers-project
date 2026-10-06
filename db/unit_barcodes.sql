@@ -33,7 +33,7 @@ ALTER TABLE `barcodesettings`
   COMMENT '1 = print a unique barcode on every unit' AFTER `StripInvalid`;
 
 ALTER TABLE `barcodesettings`
-  ADD COLUMN IF NOT EXISTS `UnitPattern` varchar(160) NOT NULL DEFAULT '{ITEM}{YY}{MM}{SEQ}'
+  ADD COLUMN IF NOT EXISTS `UnitPattern` varchar(160) NOT NULL DEFAULT '{ITEM}{YY}{MM}{DD}{SEQ}'
   COMMENT 'how a unit code is built' AFTER `UnitMode`;
 
 ALTER TABLE `barcodesettings`

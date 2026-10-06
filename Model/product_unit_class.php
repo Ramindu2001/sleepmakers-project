@@ -2,14 +2,17 @@
 //Every unit Sleep Makers make carries its own barcode
 //(docs/superpowers/specs/2026-09-23-unit-barcodes-design.md).
 //
-//A unit code is the product's own barcode, the month it was made and a serial:
+//A unit code is the product's own barcode (the prefix) and then the day it was made and a serial
+//(the suffix):
 //
-//    COO00001 2509 0013      pattern {ITEM}{YY}{MM}{SEQ}, serial 4 digits
+//    COO00001 250912 0013    pattern {ITEM}{YY}{MM}{DD}{SEQ}, serial 4 digits
 //
-//The pattern, the serial width and the separator are the shop's (barcodesettings), and the
-//serial comes from the same atomic counter the product barcodes use, so two people printing
-//at the same moment can never be given the same number. The exact day is kept on the row, so
-//a code that only carries the month still answers "how many did we make on the 12th".
+//The serial is one running number for the whole company and the day, whatever the product
+//(docs/superpowers/specs/2026-10-06-daily-unit-numbering-design.md). The pattern, the serial
+//width and the separator are the shop's (barcodesettings), and the serial comes from the same
+//atomic counter the product barcodes use, so two people printing at the same moment can never
+//be given the same number. The exact day is kept on the row, so a pattern that only carries
+//the month still answers "how many did we make on the 12th".
 //
 //Nothing here changes stock: a unit is recorded when it is PRINTED and marked RECEIVED when
 //it is scanned into a GRN. The unique key on UnitBarcode is what makes the same unit
@@ -27,9 +30,10 @@ class ProductUnits extends Dbh
     const DISPATCHED = 3;   //sent to the customer it was sold to
 
     const MAX_PER_PRINT = 5000;            //one print job; the label page caps what it renders
+    const COUNTER_SHOP = 0;                //the day's counters are the company's: no real shop has id 0
     const DEFAULTS = [
         'mode' => false,
-        'pattern' => '{ITEM}{YY}{MM}{SEQ}',
+        'pattern' => '{ITEM}{YY}{MM}{DD}{SEQ}',
         'seq_length' => 4,
         'separator' => '',
     ];
@@ -94,19 +98,61 @@ class ProductUnits extends Dbh
         return strlen($this->build($settings, 'X', date('Y-m-d'), 1)) - 1;
     }//suffix length
 
-    //Which number series a unit takes its serial from: everything in the code except the
-    //serial itself. So {ITEM}{YY}{MM}{SEQ} gives one series per item per month, and the
-    //numbering starts again at 1 whenever that part changes - the same rule the product
-    //barcodes follow ("per prefix" in db/BARCODE_MODULE.md).
-    public function scopeKey(array $settings, $item_barcode, $produced_date)
+    //The part of a unit code that is neither the item nor the serial: the production date as the
+    //pattern writes it ("250912" for {ITEM}{YY}{MM}{DD}{SEQ}), without a separator at either end.
+    private function datePart(array $settings, $produced_date)
     {
-        $prefix = $this->build($settings, $item_barcode, $produced_date, null);
+        $part = $this->build($settings, '', $produced_date, null);
         if($settings['separator'] !== '')
         {
-            $prefix = rtrim($prefix, $settings['separator']);
-        }//never end on a separator
-        return 'unit:' . strtoupper($prefix);
+            $part = trim($part, $settings['separator']);
+        }//never start or end on a separator
+        return strtoupper($part);
+    }//date part
+
+    //Which number series a unit takes its serial from: the company, and everything in the code
+    //except the item and the serial. {ITEM}{YY}{MM}{DD}{SEQ} gives one series a day for the whole
+    //company, so the serial says which unit of the day it was whatever the product; a pattern with
+    //only {YY}{MM} gives one a month. The series always matches what the code shows, which is what
+    //keeps two codes from ever being the same.
+    public function scopeKey(array $settings, $company_id, $produced_date)
+    {
+        return 'unit:c' . (int)$company_id . ':' . $this->datePart($settings, $produced_date);
     }//scope key
+
+    //Where a series that has no counter yet starts: one past the highest serial already issued in it,
+    //by any item, in any shop of the company, in any state (a voided unit keeps its code in the
+    //unique key). Days numbered item by item before the series was shared hold serials that a count
+    //from 1 would repeat. A series that holds nothing starts at 1.
+    private function seriesStart(array $settings, $company_id, $produced_date)
+    {
+        $pdo = $this->connect();
+        $part = $this->datePart($settings, $produced_date);
+
+        $stmt = $pdo->prepare("SELECT DISTINCT productunits.ProducedDate FROM productunits
+            INNER JOIN shop ON shop.SHID = productunits.shop_SHID
+            WHERE shop.Company_CMID = ?;");
+        $stmt->execute([(int)$company_id]);
+        $days = [];
+        foreach($stmt->fetchAll(PDO::FETCH_COLUMN) as $day)
+        {
+            if($this->datePart($settings, $day) === $part)
+            {
+                $days[] = $day;
+            }
+        }//the days whose code writes the same date part
+        if(empty($days))
+        {
+            return 1;
+        }
+
+        $stmt = $pdo->prepare("SELECT COALESCE(MAX(productunits.SeqNo), 0) FROM productunits
+            INNER JOIN shop ON shop.SHID = productunits.shop_SHID
+            WHERE shop.Company_CMID = ? AND productunits.ProducedDate IN ("
+            . implode(',', array_fill(0, count($days), '?')) . ");");
+        $stmt->execute(array_merge([(int)$company_id], $days));
+        return (int)$stmt->fetchColumn() + 1;
+    }//series start
 
     //what a unit code looks like under this shop's rules, for the settings page
     public function sample($shop_id, $item_barcode = 'COO00001', $produced_date = null)
@@ -164,7 +210,9 @@ class ProductUnits extends Dbh
         $settings = $this->settings($shop_id);
         $pdo = $this->connect();
         $barcodes = new BarcodeSettings();
-        $scope = $this->scopeKey($settings, $item, $date);
+        $company = (int)$product['CompanyID'];
+        $scope = $this->scopeKey($settings, $company, $date);
+        $capacity = (int)(pow(10, $settings['seq_length']) - 1);   //the most the serial's digits can carry
 
         $insert = $pdo->prepare("INSERT INTO productunits (UnitBarcode, ItemBarcode, products_PDID, shop_SHID,
             ProducedDate, SeqNo, UnitStat, PrintRef, PrintedAt, PrintedBy, PrintCount)
@@ -179,14 +227,22 @@ class ProductUnits extends Dbh
         try
         {
             $ref = $print_ref === null ? $this->nextPrintRef($shop_id) : $print_ref;
+            $start = $this->seriesStart($settings, $company, $date);
             $codes = [];
             for($i = 0; $i < $qty; $i++)
             {
-                $seq = $barcodes->allocateSequence($shop_id, $scope, 1, 1);
+                $seq = $barcodes->allocateSequence(self::COUNTER_SHOP, $scope, $start, 1);
                 if($seq < 1)
                 {
                     throw new UnitBarcodeRefused(500, 'The unit numbering could not be read. Please try again.');
                 }
+                if($seq > $capacity)
+                {
+                    $part = $this->datePart($settings, $date);
+                    throw new UnitBarcodeRefused(422, 'The unit numbering' . ($part === '' ? '' : ' for ' . $part)
+                        . ' is full: a ' . $settings['seq_length'] . '-digit serial carries at most ' . $capacity
+                        . ' units. Raise "Serial digits" in Barcode Settings.');
+                }//the serial would make this code longer than every other
                 $code = $this->build($settings, $item, $date, $seq);
                 $insert->execute([$code, $item, (int)$product['PDID'], $shop_id, $date, $seq, self::PRINTED, $ref, (int)$user_id]);
                 $codes[] = $code;
@@ -438,7 +494,7 @@ class ProductUnits extends Dbh
     private function product($product_id, $shop_id)
     {
         $stmt = $this->connect()->prepare("SELECT products.PDID, products.Barcode, products.ItemName, products.ItemType,
-            products.ProductStat, products.shop_SHID FROM products
+            products.ProductStat, products.shop_SHID, me.Company_CMID AS CompanyID FROM products
             INNER JOIN shop me ON me.SHID = ?
             INNER JOIN shop owner ON owner.SHID = products.shop_SHID
             INNER JOIN company ON company.CMID = me.Company_CMID

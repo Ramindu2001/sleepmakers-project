@@ -26,7 +26,7 @@ class UnitBarcodesMigration
     const SETTINGS_COLUMNS = array(
         'UnitMode' => "ALTER TABLE barcodesettings ADD COLUMN UnitMode TINYINT(4) NOT NULL DEFAULT 0
             COMMENT '1 = print a unique barcode on every unit' AFTER StripInvalid;",
-        'UnitPattern' => "ALTER TABLE barcodesettings ADD COLUMN UnitPattern VARCHAR(160) NOT NULL DEFAULT '{ITEM}{YY}{MM}{SEQ}'
+        'UnitPattern' => "ALTER TABLE barcodesettings ADD COLUMN UnitPattern VARCHAR(160) NOT NULL DEFAULT '{ITEM}{YY}{MM}{DD}{SEQ}'
             COMMENT 'how a unit code is built' AFTER UnitMode;",
         'UnitSeqLength' => "ALTER TABLE barcodesettings ADD COLUMN UnitSeqLength TINYINT(4) NOT NULL DEFAULT 4
             COMMENT 'digits in the per-unit serial' AFTER UnitPattern;",

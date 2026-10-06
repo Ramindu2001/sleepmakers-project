@@ -4,22 +4,25 @@
 final class ProductUnitsTest extends DatabaseTestCase
 {
     private ProductUnits $units;
+    private int $company;
     private int $warehouse;
     private int $showroom;
     private int $bed;
     private int $sheet;
+    private int $pillow;
     private int $alice;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->units = new ProductUnits();
-        $company = $this->createCompany();
-        $this->warehouse = $this->createShop($company, ['ShopName' => 'Warehouse']);
-        $this->showroom = $this->createShop($company, ['ShopName' => 'Valentino Italy']);
+        $this->company = $this->createCompany();
+        $this->warehouse = $this->createShop($this->company, ['ShopName' => 'Warehouse']);
+        $this->showroom = $this->createShop($this->company, ['ShopName' => 'Valentino Italy']);
         $this->alice = $this->createUser('alice', 'x', $this->createRole('Store Keeper'));
         $this->bed = $this->createProduct($this->warehouse, 'COO00001', 'Cooler Mattress');
         $this->sheet = $this->createProduct($this->warehouse, 'LIN00001', 'Bedsheet');
+        $this->pillow = $this->createProduct($this->warehouse, 'PIL00001', 'Pillow');
     }
 
     private function print($product_id, $date, $qty, $shop_id = null)
@@ -27,41 +30,120 @@ final class ProductUnitsTest extends DatabaseTestCase
         return $this->units->allocate($shop_id ?? $this->warehouse, $product_id, $date, $qty, $this->alice);
     }
 
+    //a unit row as it was written before the day's series was shared: only its code and serial matter
+    private function legacy($code, $item, $product_id, $date, $seq, $shop_id = null, $state = ProductUnits::PRINTED)
+    {
+        return $this->insert('productunits', ['UnitBarcode' => $code, 'ItemBarcode' => $item,
+            'products_PDID' => $product_id, 'shop_SHID' => $shop_id ?? $this->warehouse, 'ProducedDate' => $date,
+            'SeqNo' => $seq, 'UnitStat' => $state, 'PrintRef' => 'UP_OLD', 'PrintedAt' => date('Y-m-d H:i:s'),
+            'PrintedBy' => $this->alice]);
+    }
+
+    //the warehouse numbers by the day with a serial of this many digits
+    private function serialDigits($digits)
+    {
+        $this->insert('barcodesettings', ['shop_SHID' => $this->warehouse, 'UnitMode' => 1,
+            'UnitPattern' => '{ITEM}{YY}{MM}{DD}{SEQ}', 'UnitSeqLength' => $digits, 'UnitSeparator' => '']);
+    }
+
+    private function rowCount($sql)
+    {
+        return (int) $this->pdo->query($sql)->fetchColumn();
+    }
+
     // ---- building the code -------------------------------------------------------------
 
-    public function test_a_unit_code_is_the_item_the_month_and_a_serial()
+    public function test_a_unit_code_is_the_item_the_day_and_a_serial()
     {
         $batch = $this->print($this->bed, '2025-09-12', 3);
 
-        $this->assertSame(['COO0000125090001', 'COO0000125090002', 'COO0000125090003'], $batch['codes']);
+        $this->assertSame(['COO000012509120001', 'COO000012509120002', 'COO000012509120003'], $batch['codes']);
+    }
+
+    public function test_a_shop_with_no_saved_rules_numbers_by_the_day()
+    {
+        $this->assertSame('{ITEM}{YY}{MM}{DD}{SEQ}', $this->units->settings($this->warehouse)['pattern']);
     }
 
     public function test_the_serial_carries_on_where_the_last_print_left_off()
     {
         $this->print($this->bed, '2025-09-12', 2);
-        $batch = $this->print($this->bed, '2025-09-30', 2);
+        $batch = $this->print($this->bed, '2025-09-12', 2);
 
-        $this->assertSame(['COO0000125090003', 'COO0000125090004'], $batch['codes']);
+        $this->assertSame(['COO000012509120003', 'COO000012509120004'], $batch['codes']);
     }
 
-    public function test_a_new_month_and_a_new_item_each_start_at_one()
+    public function test_every_product_made_on_a_day_shares_one_running_serial()
+    {
+        $codes = array_merge(
+            $this->print($this->bed, '2025-09-12', 2)['codes'],       //A, A
+            $this->print($this->sheet, '2025-09-12', 1)['codes'],     //B
+            $this->print($this->pillow, '2025-09-12', 1)['codes'],    //C
+            $this->print($this->sheet, '2025-09-12', 1)['codes']      //B again
+        );
+
+        $this->assertSame(['COO000012509120001', 'COO000012509120002', 'LIN000012509120003',
+            'PIL000012509120004', 'LIN000012509120005'], $codes);
+    }
+
+    public function test_one_job_over_several_products_shares_the_serial_too()
+    {
+        $batch = $this->units->allocateBatch($this->warehouse, [$this->bed => 2, $this->sheet => 2], '2025-09-12', $this->alice);
+        $rows = $this->pdo->query('SELECT UnitBarcode FROM productunits ORDER BY PUID')->fetchAll(PDO::FETCH_COLUMN);
+
+        $this->assertSame(['COO000012509120001', 'COO000012509120002', 'LIN000012509120003', 'LIN000012509120004'], $rows);
+        $this->assertSame([$this->bed => 2, $this->sheet => 2], $batch['counts']);
+    }
+
+    public function test_a_new_day_starts_again_at_one()
     {
         $this->print($this->bed, '2025-09-12', 2);
 
-        $this->assertSame(['COO0000125100001'], $this->print($this->bed, '2025-10-01', 1)['codes']);
-        $this->assertSame(['LIN0000125090001'], $this->print($this->sheet, '2025-09-12', 1)['codes']);
+        $this->assertSame(['LIN000012509130001'], $this->print($this->sheet, '2025-09-13', 1)['codes']);
+        $this->assertSame(['COO000012509120003'], $this->print($this->bed, '2025-09-12', 1)['codes'], 'the earlier day carries on');
     }
 
-    public function test_the_number_series_is_named_after_everything_but_the_serial()
+    public function test_two_shops_of_one_company_share_one_series()
+    {
+        $showroomPiece = $this->createProduct($this->showroom, 'SHW00001', 'Showroom piece');
+        $this->print($this->bed, '2025-09-12', 1);
+
+        $batch = $this->print($showroomPiece, '2025-09-12', 1, $this->showroom);
+
+        $this->assertSame(['SHW000012509120002'], $batch['codes']);
+    }
+
+    public function test_two_companies_never_share_a_series()
+    {
+        $elsewhere = $this->createShop($this->createCompany(), ['ShopName' => 'Elsewhere']);
+        $theirs = $this->createProduct($elsewhere, 'ELS00001', 'Their bed');
+        $this->print($this->bed, '2025-09-12', 3);
+
+        $batch = $this->print($theirs, '2025-09-12', 1, $elsewhere);
+
+        $this->assertSame(['ELS000012509120001'], $batch['codes']);
+    }
+
+    public function test_the_number_series_is_named_after_the_company_and_the_date_part()
     {
         $rules = $this->units->settings($this->warehouse);
+        $key = 'unit:c' . $this->company . ':';
 
-        $this->assertSame('unit:COO000012509', $this->units->scopeKey($rules, 'COO00001', '2025-09-12'));
-        $this->assertSame('unit:COO000012510', $this->units->scopeKey($rules, 'COO00001', '2025-10-01'));
-        $this->assertSame('unit:LIN000012509', $this->units->scopeKey($rules, 'LIN00001', '2025-09-12'));
+        $this->assertSame($key . '250912', $this->units->scopeKey($rules, $this->company, '2025-09-12'));
+        $this->assertSame($key . '251001', $this->units->scopeKey($rules, $this->company, '2025-10-01'));
+
+        $monthly = ['mode' => true, 'pattern' => '{ITEM}{YY}{MM}{SEQ}', 'seq_length' => 4, 'separator' => ''];
+        $this->assertSame($key . '2509', $this->units->scopeKey($monthly, $this->company, '2025-09-12'));
+        $this->assertSame($key . '2509', $this->units->scopeKey($monthly, $this->company, '2025-09-30'));
 
         $dashed = ['mode' => true, 'pattern' => '{ITEM}-{YY}-{MM}-{SEQ}', 'seq_length' => 4, 'separator' => '-'];
-        $this->assertSame('unit:COO00001-25-09', $this->units->scopeKey($dashed, 'COO00001', '2025-09-12'));
+        $this->assertSame($key . '25-09', $this->units->scopeKey($dashed, $this->company, '2025-09-12'));
+
+        $joined = ['mode' => true, 'pattern' => '{ITEM}{YY}{MM}{DD}{SEQ}', 'seq_length' => 4, 'separator' => '-'];
+        $this->assertSame($key . '25-09-12', $this->units->scopeKey($joined, $this->company, '2025-09-12'));
+
+        $undated = ['mode' => true, 'pattern' => '{ITEM}{SEQ}', 'seq_length' => 4, 'separator' => ''];
+        $this->assertSame($key, $this->units->scopeKey($undated, $this->company, '2025-09-12'));
     }
 
     public function test_the_shop_can_change_the_pattern()
@@ -70,6 +152,85 @@ final class ProductUnitsTest extends DatabaseTestCase
             'UnitPattern' => '{ITEM}{YY}{MM}{DD}{SEQ}', 'UnitSeqLength' => 3, 'UnitSeparator' => '-']);
 
         $this->assertSame(['COO00001-25-09-12-001'], $this->print($this->bed, '2025-09-12', 1)['codes']);
+    }
+
+    // ---- a series that already holds serials -------------------------------------------
+
+    public function test_a_day_that_already_has_per_item_serials_carries_on_after_the_highest()
+    {
+        //how the numbering used to run: every item counted from one
+        foreach ([1, 2, 3] as $n) {
+            $this->legacy(sprintf('COO00001250912%04d', $n), 'COO00001', $this->bed, '2025-09-12', $n);
+        }
+        foreach ([1, 2] as $n) {
+            $this->legacy(sprintf('LIN00001250912%04d', $n), 'LIN00001', $this->sheet, '2025-09-12', $n);
+        }
+
+        $this->assertSame(['COO000012509120004'], $this->print($this->bed, '2025-09-12', 1)['codes']);
+        $this->assertSame(['LIN000012509120005'], $this->print($this->sheet, '2025-09-12', 1)['codes']);
+    }
+
+    public function test_a_voided_unit_still_holds_its_serial()
+    {
+        $this->legacy('COO000012509120007', 'COO00001', $this->bed, '2025-09-12', 7, null, ProductUnits::VOIDED);
+
+        $this->assertSame(['LIN000012509120008'], $this->print($this->sheet, '2025-09-12', 1)['codes']);
+    }
+
+    public function test_units_of_another_company_do_not_move_the_start()
+    {
+        $elsewhere = $this->createShop($this->createCompany(), ['ShopName' => 'Elsewhere']);
+        $theirs = $this->createProduct($elsewhere, 'ELS00001', 'Their bed');
+        $this->legacy('ELS000012509120009', 'ELS00001', $theirs, '2025-09-12', 9, $elsewhere);
+
+        $this->assertSame(['COO000012509120001'], $this->print($this->bed, '2025-09-12', 1)['codes']);
+    }
+
+    public function test_a_monthly_pattern_starts_after_the_highest_serial_of_the_whole_month()
+    {
+        $this->insert('barcodesettings', ['shop_SHID' => $this->warehouse, 'UnitMode' => 1,
+            'UnitPattern' => '{ITEM}{YY}{MM}{SEQ}', 'UnitSeqLength' => 4, 'UnitSeparator' => '']);
+        $this->legacy('COO0000125090004', 'COO00001', $this->bed, '2025-09-05', 4);
+
+        //another day of the same month: the code does not say which day, so the series is the month's
+        $this->assertSame(['LIN0000125090005'], $this->print($this->sheet, '2025-09-12', 1)['codes']);
+        $this->assertSame(['LIN0000125100001'], $this->print($this->sheet, '2025-10-01', 1)['codes']);
+    }
+
+    // ---- a series that is full ---------------------------------------------------------
+
+    public function test_numbering_stops_when_the_serial_has_no_digits_left_and_gives_nothing_away()
+    {
+        $this->serialDigits(1);
+        $this->print($this->bed, '2025-09-12', 9);        //1 to 9 fills one digit
+
+        try {
+            $this->print($this->sheet, '2025-09-12', 1);
+            $this->fail('the tenth unit of the day should have been refused');
+        } catch (UnitBarcodeRefused $e) {
+            $this->assertSame(422, $e->status);
+            $this->assertStringContainsString('Serial digits', $e->getMessage());
+        }
+
+        $this->assertSame(9, $this->rowCount('SELECT COUNT(*) FROM productunits'));
+        $next = $this->pdo->prepare('SELECT NextValue FROM barcodesequence WHERE shop_SHID = 0 AND ScopeKey = ?');
+        $next->execute(['unit:c' . $this->company . ':250912']);
+        $this->assertSame(10, (int) $next->fetchColumn(), 'the refused number went back');
+    }
+
+    public function test_a_job_that_runs_out_of_serials_numbers_nothing_at_all()
+    {
+        $this->serialDigits(1);
+
+        try {
+            $this->units->allocateBatch($this->warehouse, [$this->bed => 5, $this->sheet => 6], '2025-09-12', $this->alice);
+            $this->fail('eleven units do not fit one digit');
+        } catch (UnitBarcodeRefused $e) {
+            $this->assertSame(422, $e->status);
+        }
+
+        $this->assertSame(0, $this->rowCount('SELECT COUNT(*) FROM productunits'));
+        $this->assertSame(0, $this->rowCount('SELECT COUNT(*) FROM barcodesequence WHERE shop_SHID = 0'), 'no counter was left behind');
     }
 
     // ---- what is written ---------------------------------------------------------------
