@@ -12,6 +12,15 @@
  */
 class BarcodeSettings extends Dbh
 {
+    /**
+     * The pattern a shop numbers its units by until it chooses one: a daily series.
+     *
+     * saveSettings() writes it into the row it creates. The column's own default cannot be
+     * relied on, because a database migrated before the daily default still has the old
+     * monthly pattern there. ProductUnits::DEFAULTS and the install defaults carry the same value.
+     */
+    const DEFAULT_UNIT_PATTERN = '{ITEM}{YY}{MM}{DD}{SEQ}';
+
     //=========================================================== settings ====
 
     /**
@@ -42,6 +51,9 @@ class BarcodeSettings extends Dbh
      * $data uses the same keys as bcgDefaultSettings(). Anything missing keeps
      * its current value because the caller merges before calling.
      *
+     * A row created here starts unit numbering on DEFAULT_UNIT_PATTERN. The unit rules of a
+     * row that already exists are left alone: they have their own form (saveUnitSettings()).
+     *
      * Every column name is back quoted on purpose: `Separator` is a reserved
      * word in MariaDB (GROUP_CONCAT ... SEPARATOR) and the statement is a
      * syntax error without them.
@@ -57,8 +69,8 @@ class BarcodeSettings extends Dbh
                         (`shop_SHID`, `AutoGenerate`, `Pattern`, `FixedPrefix`, `Suffix`, `ShopCode`,
                          `Separator`, `CatCodeLength`, `SubCodeLength`, `SeqScope`, `SeqStart`,
                          `SeqStep`, `SeqLength`, `SeqPadChar`, `Casing`, `Symbology`, `MaxLength`,
-                         `StripInvalid`, `LabelDefaults`, `UpdatedDate`, `UpdateUserID`)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),?)
+                         `StripInvalid`, `LabelDefaults`, `UnitPattern`, `UpdatedDate`, `UpdateUserID`)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),?)
                     ON DUPLICATE KEY UPDATE
                         `AutoGenerate`  = VALUES(`AutoGenerate`),
                         `Pattern`       = VALUES(`Pattern`),
@@ -102,6 +114,7 @@ class BarcodeSettings extends Dbh
                 (int) $data['MaxLength'],
                 (int) $data['StripInvalid'],
                 (string) $data['LabelDefaults'],
+                self::DEFAULT_UNIT_PATTERN,
                 (int) $user_id,
             ));
 

@@ -111,6 +111,13 @@ A shop with unit mode on but no saved pattern gets `{ITEM}{YY}{MM}{DD}{SEQ}` (wa
 `db/unit_barcodes.sql`), which only matter to new installs. A shop that has saved a pattern
 keeps it.
 
+A database migrated before this change keeps the old monthly pattern as its *column* default,
+so the row that "Save as shop default" or the barcode rules form creates for a shop with no row
+would carry it. `BarcodeSettings::saveSettings()` therefore writes the daily pattern itself when it
+creates a row (`BarcodeSettings::DEFAULT_UNIT_PATTERN`, the one value `ProductUnits::DEFAULTS` also
+uses) and never touches the unit rules of a row that exists. Rows made earlier keep what they hold:
+no schema change and no data migration.
+
 A saved pattern without `{DD}` still works: its series becomes company-wide for the month
 instead of per item. That is the intended meaning of "not per product".
 

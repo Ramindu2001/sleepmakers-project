@@ -1,6 +1,8 @@
 <?php
 //Model/product_unit_class.php: one row per printed unit, its code, and the rules that make
 //the same unit impossible to register twice.
+require_once __DIR__ . '/../Includes/barcode_generator.php'; //bcgNormalizeSettings, for the tests that save the product rules
+
 final class ProductUnitsTest extends DatabaseTestCase
 {
     private ProductUnits $units;
@@ -63,6 +65,38 @@ final class ProductUnitsTest extends DatabaseTestCase
     public function test_a_shop_with_no_saved_rules_numbers_by_the_day()
     {
         $this->assertSame('{ITEM}{YY}{MM}{DD}{SEQ}', $this->units->settings($this->warehouse)['pattern']);
+    }
+
+    //what "Save as shop default" and the barcode rules form write: the product rules and the label
+    //defaults, with nothing about unit numbering in them
+    private function saveTheProductRules($shop_id)
+    {
+        $barcodes = new BarcodeSettings();
+        $rules = bcgNormalizeSettings($barcodes->getSettings($shop_id));
+        $rules['LabelDefaults'] = '{"unit_copies":3}';
+        $this->assertTrue($barcodes->saveSettings($shop_id, $rules, $this->alice));
+    }
+
+    public function test_a_shop_that_only_saved_its_label_defaults_still_numbers_by_the_day()
+    {
+        //a database migrated before the daily default still has the monthly pattern as its column default
+        $this->pdo->exec("ALTER TABLE barcodesettings ALTER COLUMN UnitPattern SET DEFAULT '{ITEM}{YY}{MM}{SEQ}'");
+
+        $this->saveTheProductRules($this->showroom);
+
+        $this->assertSame('{ITEM}{YY}{MM}{DD}{SEQ}', $this->units->settings($this->showroom)['pattern']);
+    }
+
+    public function test_saving_the_product_rules_leaves_the_pattern_a_shop_chose()
+    {
+        $this->insert('barcodesettings', ['shop_SHID' => $this->warehouse, 'UnitMode' => 1,
+            'UnitPattern' => '{ITEM}-{YY}{MM}-{SEQ}', 'UnitSeqLength' => 3, 'UnitSeparator' => '']);
+
+        $this->saveTheProductRules($this->warehouse);
+
+        $settings = $this->units->settings($this->warehouse);
+        $this->assertSame('{ITEM}-{YY}{MM}-{SEQ}', $settings['pattern']);
+        $this->assertTrue($settings['mode']);
     }
 
     public function test_the_serial_carries_on_where_the_last_print_left_off()

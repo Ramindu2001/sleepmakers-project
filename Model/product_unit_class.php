@@ -33,7 +33,7 @@ class ProductUnits extends Dbh
     const COUNTER_SHOP = 0;                //the day's counters are the company's: no real shop has id 0
     const DEFAULTS = [
         'mode' => false,
-        'pattern' => '{ITEM}{YY}{MM}{DD}{SEQ}',
+        'pattern' => BarcodeSettings::DEFAULT_UNIT_PATTERN,
         'seq_length' => 4,
         'separator' => '',
     ];
