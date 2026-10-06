@@ -292,6 +292,10 @@ class E2EFixtures
         $this->pdo->exec("DELETE FROM productunits WHERE shop_SHID IN ($shops)");
         $this->pdo->exec("DELETE FROM barcodesettings WHERE shop_SHID IN ($shops)");
         $this->pdo->exec("DELETE FROM barcodesequence WHERE shop_SHID IN ($shops)");
+        //the daily unit counters belong to the company, not to a shop (db/UNIT_BARCODES_MODULE.md)
+        foreach ($this->pdo->query("SELECT CMID FROM company WHERE ComName = 'e2e Company'")->fetchAll(PDO::FETCH_COLUMN) as $company) {
+            $this->pdo->prepare("DELETE FROM barcodesequence WHERE shop_SHID = 0 AND ScopeKey LIKE ?")->execute(['unit:c' . (int) $company . ':%']);
+        }//each e2e company
         //a check that took a real sale leaves an invoice pointing at an e2e user or shop
         $invoices = "SELECT IHID FROM invoiceheader WHERE user_USID IN ($users) OR shop_SHID IN ($shops)";
         $this->pdo->exec("DELETE FROM inventory_consumption WHERE invoice_headerID IN ($invoices)");

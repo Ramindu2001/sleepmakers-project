@@ -19,9 +19,9 @@ $pw = $fx->password;
 $W = $fx->shops['W'];
 $S = $fx->shops['S'];
 
-//this warehouse prints a unique barcode on every unit
+//this warehouse prints a unique barcode on every unit, numbered by the day
 $pdo->prepare("INSERT INTO barcodesettings (shop_SHID, UnitMode, UnitPattern, UnitSeqLength, UnitSeparator)
-    VALUES (?, 1, '{ITEM}{YY}{MM}{SEQ}', 4, '') ON DUPLICATE KEY UPDATE UnitMode = 1")->execute([$W]);
+    VALUES (?, 1, '{ITEM}{YY}{MM}{DD}{SEQ}', 4, '') ON DUPLICATE KEY UPDATE UnitMode = 1")->execute([$W]);
 
 //the units of a print job, in the order they were numbered
 function unitsOf(PDO $pdo, $shop_id, $ref)
@@ -66,11 +66,11 @@ try {
     $codes = array_column($units, 'UnitBarcode');
 
     check('three units were numbered', count($units) === 3, $b);
-    check('each one has its own code, built from the item, the month and a serial',
-        $codes === ['E2EBED0125090001', 'E2EBED0125090002', 'E2EBED0125090003'], $b);
+    check('each one has its own code, built from the item, the day and a serial',
+        $codes === ['E2EBED012509120001', 'E2EBED012509120002', 'E2EBED012509120003'], $b);
     check('and each carries the day it was made', array_unique(array_column($units, 'ProducedDate')) === ['2025-09-12'], $b);
-    check('the labels show those codes, one sticker each', $b->has('E2EBED0125090001')
-        && $b->has('E2EBED0125090002') && $b->has('E2EBED0125090003'), $b);
+    check('the labels show those codes, one sticker each', $b->has('E2EBED012509120001')
+        && $b->has('E2EBED012509120002') && $b->has('E2EBED012509120003'), $b);
     checkClean('the label page', $b);
 
     echo "What was produced\n";
@@ -81,6 +81,23 @@ try {
     check('looking one up shows its item and the day it was made', $b->has('e2e Bed')
         && $b->has('2025-09-12') && $b->has('Printed, not received yet'), $b);
     checkClean('the unit barcodes page', $b);
+
+    echo "Finding the product from a unit's sticker\n";
+    $b->get('AJAX/Products/getProductSearch.php?txt_input=' . urlencode($codes[0]));
+    check('the product page search finds the product from the whole unit code',
+        $b->has('e2e Bed') && $b->has('E2EBED01'), $b);
+    $b->get('AJAX/Products/getProductSearch.php?txt_input=' . urlencode(strtolower($codes[1])));
+    check('in any case', $b->has('e2e Bed'), $b);
+    $b->get('AJAX/Products/getProductSearch.php?txt_input=' . urlencode('E2EBED01'));
+    check('and from the product barcode alone, as before', $b->has('e2e Bed'), $b);
+    $b->get('AJAX/Products/getProductSearch.php?txt_input=' . urlencode('Bed'));
+    check('and from part of the name, as before', $b->has('e2e Bed'), $b);
+    $b->get('AJAX/Products/getProductSearch.php?txt_input=' . urlencode($codes[0] . 'X'));
+    check('but not from a code that was never printed', !$b->has('e2e Bed'), $b);
+    $b->get('AJAX/Products/getProductSearch.php?txt_input=' . urlencode("O'Brien \" % \\ _"));
+    check('and text with quotes, wildcards and a backslash is only text',
+        $b->status === 200 && !$b->has('Error: Unable to read'), $b);
+    checkClean('the product search', $b);
 
     echo "Scanning them into a GRN\n";
     $b->get('Public/home.php');
@@ -111,7 +128,7 @@ try {
     check('forcing it through is refused as well (422)', $b->status === 422, $b);
 
     echo "A code we never printed\n";
-    scan($b, 'check', $stock->grn['open'], 'E2EBED0125099999', $token);
+    scan($b, 'check', $stock->grn['open'], 'E2EBED012509129999', $token);
     $preview = json_decode($b->body, true);
     check('is called out rather than counted',
         strpos((string) $preview['preview']['lines'][0]['message'], 'Not a unit we printed') !== false, $b);

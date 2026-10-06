@@ -8,7 +8,7 @@ include "../../Model/user_class.php";
 
 $user_id = $_SESSION['user_id'];
 $shop_id = $_SESSION['shop_id'];
-$txt_input = $_GET['txt_input'];
+$txt_input = isset($_GET['txt_input']) ? (string)$_GET['txt_input'] : '';
 
 $dbObj = new DBTransactions();
 $shopObj = new Shop();
@@ -45,23 +45,39 @@ $shopData = $dbObj->getData($sql);
 $multi_category = floatval($shopData[0]['is_multicategory']);
 $company_id = floatval($shopData[0]['CMID']);
 
+//a unit's sticker carries the product's own barcode followed by the unit's date and serial: typed or
+//scanned whole, it stands for that product (db/UNIT_BARCODES_MODULE.md)
+require_once "../../Model/unit_barcode_refused_class.php";
+require_once "../../Model/product_unit_class.php";
+$unitItem = (new ProductUnits())->itemBarcodeFor($txt_input, $shop_id);
+
+//the text and the unit's item go in as parameters, never into the SQL itself
+$match = "(concat(products.Barcode, products.ItemName) LIKE ?" . ($unitItem === '' ? "" : " OR products.Barcode = ?") . ")";
+$params = ["%".$txt_input."%"];
+if($unitItem !== '')
+{
+    $params[] = $unitItem;
+}//a unit code
+
 if($multi_category == 1)
 {
     $sql_1 = "SELECT *,categories.CTID AS cat_ID FROM products 
     INNER JOIN subcategories ON subcategories.SCID = products.Subcategories_SCID
     INNER JOIN categories ON categories.CTID = subcategories.categories_CTID
     INNER JOIN shop ON shop.SHID = products.shop_SHID
-    WHERE concat(Barcode, ItemName) LIKE '%".$txt_input."%' AND shop.Company_CMID = ".$company_id." LIMIT 50;";
+    WHERE ".$match." AND shop.Company_CMID = ? LIMIT 50;";
+    $params[] = (int)$company_id;
 }//has multi category
 else
 {
     $sql_1 = "SELECT *,categories.CTID AS cat_ID FROM products 
     INNER JOIN subcategories ON subcategories.SCID = products.Subcategories_SCID
     INNER JOIN categories ON categories.CTID = subcategories.categories_CTID
-    WHERE concat(Barcode, ItemName) LIKE '%".$txt_input."%' AND products.shop_SHID = ".$shop_id." LIMIT 50;";
+    WHERE ".$match." AND products.shop_SHID = ? LIMIT 50;";
+    $params[] = (int)$shop_id;
 }//mo multi category
 
-$prodData = $dbObj->getData($sql_1);
+$prodData = $dbObj->getMultipleData($sql_1, $params);
 
 echo "<tr>";
 echo "<th style='width:34px;'>";
